@@ -6306,9 +6306,9 @@ write (stdlogunit, generic_COBALT_nml)
     real, dimension(:,:,:),pointer :: temp_field
 
     if (do_CBED) then
-      call CBED_update_from_bottom(cobalt, tracer_list, dt, tau, model_time)
+      call CBED_update_from_bottom(tracer_list, dt, tau, model_time, cobalt%fcadet_arag_btm, cobalt%id_fcadet_arag_btm, cobalt%fcadet_calc_btm, cobalt%id_fcadet_calc_btm, cobalt%ffedet_btm, cobalt%id_ffedet_btm, cobalt%flithdet_btm, cobalt%id_flithdet_btm, cobalt%fndet_btm, cobalt%id_fndet_btm, cobalt%fpdet_btm, cobalt%id_fpdet_btm, cobalt%fsidet_btm, cobalt%id_fsidet_btm)
     else
-      call generic_COBALT_update_from_bottom_simple_slab(cobalt, tracer_list, dt, tau, model_time)
+      call generic_COBALT_update_from_bottom_simple_slab(tracer_list, dt, tau, model_time, cobalt%fcadet_arag_btm, cobalt%id_fcadet_arag_btm, cobalt%fcadet_calc_btm, cobalt%id_fcadet_calc_btm, cobalt%ffedet_btm, cobalt%id_ffedet_btm, cobalt%flithdet_btm, cobalt%id_flithdet_btm, cobalt%fndet_btm, cobalt%id_fndet_btm, cobalt%fpdet_btm, cobalt%id_fpdet_btm, cobalt%fsidet_btm, cobalt%id_fsidet_btm)
     endif
 
   end subroutine generic_COBALT_update_from_bottom

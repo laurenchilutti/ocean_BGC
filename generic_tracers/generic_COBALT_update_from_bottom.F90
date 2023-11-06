@@ -45,12 +45,26 @@ contains
   !  </IN>
   !
   ! </SUBROUTINE>
-  subroutine generic_COBALT_update_from_bottom_simple_slab(cobalt, tracer_list, dt, tau, model_time)
-    type(generic_COBALT_type), intent(inout) :: cobalt
+  subroutine generic_COBALT_update_from_bottom_simple_slab(tracer_list, dt, tau, model_time, fcadet_arag_btm, id_fcadet_arag_btm, fcadet_calc_btm, id_fcadet_calc_btm, ffedet_btm, id_ffedet_btm, flithdet_btm, id_flithdet_btm, fndet_btm, id_fndet_btm, fpdet_btm, id_fpdet_btm, fsidet_btm, id_fsidet_btm)
     type(g_tracer_type), pointer :: tracer_list
     real,               intent(in) :: dt
     integer,            intent(in) :: tau
     type(time_type),    intent(in) :: model_time
+    real, dimension(:,:), intent(inout):: fcadet_arag_btm
+    integer,              intent(in) :: id_fcadet_arag_btm
+    real, dimension(:,:), intent(inout) :: fcadet_calc_btm
+    integer,              intent(in) :: id_fcadet_calc_btm
+    real, dimension(:,:), intent(inout) :: ffedet_btm
+    integer,              intent(in) :: id_ffedet_btm
+    real, dimension(:,:), intent(inout) :: flithdet_bt
+    integer,              intent(in) :: id_flithdet_btm
+    real, dimension(:,:), intent(inout) :: fndet_btm
+    integer,              intent(in) :: id_fndet_btm
+    real, dimension(:,:), intent(inout) :: fpdet_btm
+    integer,              intent(in) :: id_fpdet_btm
+    real, dimension(:,:), intent(inout) :: fsidet_btm
+    integer,              intent(in) :: id_fsidet_btm
+
     integer :: isc,iec, jsc,jec,isd,ied,jsd,jed,nk,ntau
     logical :: used
     real, dimension(:,:,:),pointer :: grid_tmask
@@ -62,82 +76,82 @@ contains
     ! The bottom reservoirs of aragonite and calcite are immediately redistributed to the
     ! water column as a bottom flux (btf) where they impact the alkalinity and DIC
     !
-    call g_tracer_get_values(tracer_list,'cadet_arag','btm_reservoir',cobalt%fcadet_arag_btm,isd,jsd)
-    cobalt%fcadet_arag_btm = cobalt%fcadet_arag_btm/dt
+    call g_tracer_get_values(tracer_list,'cadet_arag','btm_reservoir',fcadet_arag_btm,isd,jsd)
+    fcadet_arag_btm = fcadet_arag_btm/dt
     call g_tracer_get_pointer(tracer_list,'cadet_arag_btf','field',temp_field)
-    temp_field(:,:,1) = cobalt%fcadet_arag_btm(:,:)
+    temp_field(:,:,1) = fcadet_arag_btm(:,:)
     call g_tracer_set_values(tracer_list,'cadet_arag','btm_reservoir',0.0)
-    if (cobalt%id_fcadet_arag_btm .gt. 0)           &
-         used = g_send_data(cobalt%id_fcadet_arag_btm,cobalt%fcadet_arag_btm, &
+    if (id_fcadet_arag_btm .gt. 0)           &
+         used = g_send_data(id_fcadet_arag_btm,fcadet_arag_btm, &
          model_time, rmask = grid_tmask(:,:,1),& 
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
 
-    call g_tracer_get_values(tracer_list,'cadet_calc','btm_reservoir',cobalt%fcadet_calc_btm,isd,jsd)
-    cobalt%fcadet_calc_btm = cobalt%fcadet_calc_btm/dt
+    call g_tracer_get_values(tracer_list,'cadet_calc','btm_reservoir',fcadet_calc_btm,isd,jsd)
+    fcadet_calc_btm = fcadet_calc_btm/dt
     call g_tracer_get_pointer(tracer_list,'cadet_calc_btf','field',temp_field)
-    temp_field(:,:,1) = cobalt%fcadet_calc_btm(:,:)
+    temp_field(:,:,1) = fcadet_calc_btm(:,:)
     call g_tracer_set_values(tracer_list,'cadet_calc','btm_reservoir',0.0)
-    if (cobalt%id_fcadet_calc_btm .gt. 0)           &
-         used = g_send_data(cobalt%id_fcadet_calc_btm, cobalt%fcadet_calc_btm, &
+    if (id_fcadet_calc_btm .gt. 0)           &
+         used = g_send_data(id_fcadet_calc_btm, fcadet_calc_btm, &
          model_time, rmask = grid_tmask(:,:,1), &
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
     !
     ! Iron is buried, but can re-enter the water column in association with
     ! organic matter degradation (see ffe_sed in update_from_source)
     !
-    call g_tracer_get_values(tracer_list,'fedet','btm_reservoir',cobalt%ffedet_btm,isd,jsd)
-    cobalt%ffedet_btm = cobalt%ffedet_btm/dt
+    call g_tracer_get_values(tracer_list,'fedet','btm_reservoir',ffedet_btm,isd,jsd)
+    ffedet_btm = ffedet_btm/dt
     ! uncomment for "no mass change check"
     !call g_tracer_get_pointer(tracer_list,'fedet_btf','field',temp_field)
-    !temp_field(:,:,1) = cobalt%ffedet_btm(:,:)
+    !temp_field(:,:,1) = ffedet_btm(:,:)
     call g_tracer_set_values(tracer_list,'fedet','btm_reservoir',0.0)
-    if (cobalt%id_ffedet_btm .gt. 0)           &
-         used = g_send_data(cobalt%id_ffedet_btm, cobalt%ffedet_btm, &
+    if (id_ffedet_btm .gt. 0)           &
+         used = g_send_data(id_ffedet_btm, ffedet_btm, &
          model_time, rmask = grid_tmask(:,:,1), &
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
     !
     ! Lithogenic material is buried
     !
-    call g_tracer_get_values(tracer_list,'lithdet','btm_reservoir',cobalt%flithdet_btm,isd,jsd)
-    cobalt%flithdet_btm = cobalt%flithdet_btm /dt
+    call g_tracer_get_values(tracer_list,'lithdet','btm_reservoir',flithdet_btm,isd,jsd)
+    flithdet_btm = flithdet_btm /dt
     call g_tracer_get_pointer(tracer_list,'lithdet_btf','field',temp_field)
-    temp_field(:,:,1) = cobalt%flithdet_btm(:,:)
+    temp_field(:,:,1) = flithdet_btm(:,:)
     call g_tracer_set_values(tracer_list,'lithdet','btm_reservoir',0.0)
-    if (cobalt%id_flithdet_btm .gt. 0)           &
-         used = g_send_data(cobalt%id_flithdet_btm, cobalt%flithdet_btm, &
+    if (id_flithdet_btm .gt. 0)           &
+         used = g_send_data(id_flithdet_btm, flithdet_btm, &
          model_time, rmask = grid_tmask(:,:,1),&
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
     !
     ! N, P, and Si detritus that hits the bottom is re-entered as a bottom source of 
     ! nh4, po4, and SiO4 respectively
     !
-    call g_tracer_get_values(tracer_list,'ndet','btm_reservoir',cobalt%fndet_btm,isd,jsd)
-    cobalt%fndet_btm = cobalt%fndet_btm/dt
+    call g_tracer_get_values(tracer_list,'ndet','btm_reservoir',fndet_btm,isd,jsd)
+    fndet_btm = fndet_btm/dt
     call g_tracer_get_pointer(tracer_list,'ndet_btf','field',temp_field)
-    temp_field(:,:,1) = cobalt%fndet_btm(:,:)
+    temp_field(:,:,1) = fndet_btm(:,:)
     call g_tracer_set_values(tracer_list,'ndet','btm_reservoir',0.0)
-    if (cobalt%id_fndet_btm .gt. 0)           &
-         used = g_send_data(cobalt%id_fndet_btm,cobalt%fndet_btm,          &
+    if (id_fndet_btm .gt. 0)           &
+         used = g_send_data(id_fndet_btm,fndet_btm,          &
          model_time, rmask = grid_tmask(:,:,1),&
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
 
-    call g_tracer_get_values(tracer_list,'pdet','btm_reservoir',cobalt%fpdet_btm,isd,jsd)
-    cobalt%fpdet_btm = cobalt%fpdet_btm/dt
+    call g_tracer_get_values(tracer_list,'pdet','btm_reservoir',fpdet_btm,isd,jsd)
+    fpdet_btm = fpdet_btm/dt
     call g_tracer_get_pointer(tracer_list,'pdet_btf','field',temp_field)
-    temp_field(:,:,1) = cobalt%fpdet_btm(:,:)
+    temp_field(:,:,1) = fpdet_btm(:,:)
     call g_tracer_set_values(tracer_list,'pdet','btm_reservoir',0.0)
-    if (cobalt%id_fpdet_btm .gt. 0)           &
-         used = g_send_data(cobalt%id_fpdet_btm,cobalt%fpdet_btm,          &
+    if (id_fpdet_btm .gt. 0)           &
+         used = g_send_data(id_fpdet_btm,fpdet_btm,          &
          model_time, rmask = grid_tmask(:,:,1),&
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
 
-    call g_tracer_get_values(tracer_list,'sidet','btm_reservoir',cobalt%fsidet_btm,isd,jsd)
-    cobalt%fsidet_btm = cobalt%fsidet_btm/dt
+    call g_tracer_get_values(tracer_list,'sidet','btm_reservoir',fsidet_btm,isd,jsd)
+    fsidet_btm = fsidet_btm/dt
     call g_tracer_get_pointer(tracer_list,'sidet_btf','field',temp_field)
-    temp_field(:,:,1) = cobalt%fsidet_btm(:,:)
+    temp_field(:,:,1) = fsidet_btm(:,:)
     call g_tracer_set_values(tracer_list,'sidet','btm_reservoir',0.0)
-    if (cobalt%id_fsidet_btm .gt. 0)           &
-         used = g_send_data(cobalt%id_fsidet_btm,    cobalt%fsidet_btm,          &
+    if (id_fsidet_btm .gt. 0)           &
+         used = g_send_data(id_fsidet_btm,    fsidet_btm,          &
          model_time, rmask = grid_tmask(:,:,1),&
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
 
@@ -173,12 +187,26 @@ contains
   !  </IN>
   !
   ! </SUBROUTINE>
-  subroutine CBED_update_from_bottom(cobalt, tracer_list, dt, tau, model_time)
-    type(generic_COBALT_type), intent(inout) :: cobalt
+  subroutine CBED_update_from_bottom(cobalt, tracer_list, dt, tau, model_time, fcadet_arag_btm, id_fcadet_arag_btm, fcadet_calc_btm, id_fcadet_calc_btm, ffedet_btm, id_ffedet_btm, flithdet_btm, id_flithdet_btm, fndet_btm, id_fndet_btm, fpdet_btm, id_fpdet_btm, fsidet_btm, id_fsidet_btm)
     type(g_tracer_type), pointer :: tracer_list
     real,               intent(in) :: dt
     integer,            intent(in) :: tau
     type(time_type),    intent(in) :: model_time
+    real, dimension(:,:), intent(inout):: fcadet_arag_btm
+    integer,              intent(in) :: id_fcadet_arag_btm
+    real, dimension(:,:), intent(inout) :: fcadet_calc_btm
+    integer,              intent(in) :: id_fcadet_calc_btm
+    real, dimension(:,:), intent(inout) :: ffedet_btm
+    integer,              intent(in) :: id_ffedet_btm
+    real, dimension(:,:), intent(inout) :: flithdet_bt
+    integer,              intent(in) :: id_flithdet_btm
+    real, dimension(:,:), intent(inout) :: fndet_btm
+    integer,              intent(in) :: id_fndet_btm
+    real, dimension(:,:), intent(inout) :: fpdet_btm
+    integer,              intent(in) :: id_fpdet_btm
+    real, dimension(:,:), intent(inout) :: fsidet_btm
+    integer,              intent(in) :: id_fsidet_btm
+
     integer :: isc,iec, jsc,jec,isd,ied,jsd,jed,nk,ntau
     logical :: used
     real, dimension(:,:,:),pointer :: grid_tmask
@@ -190,85 +218,85 @@ contains
     ! The bottom reservoirs of aragonite and calcite are immediately redistributed to the
     ! water column as a bottom flux (btf) where they impact the alkalinity and DIC
     !
-    call g_tracer_get_values(tracer_list,'cadet_arag','btm_reservoir',cobalt%fcadet_arag_btm,isd,jsd)
-    cobalt%fcadet_arag_btm = cobalt%fcadet_arag_btm/dt
+    call g_tracer_get_values(tracer_list,'cadet_arag','btm_reservoir',fcadet_arag_btm,isd,jsd)
+    fcadet_arag_btm = fcadet_arag_btm/dt
     call g_tracer_get_pointer(tracer_list,'cadet_arag_btf','field',temp_field)
-    temp_field(:,:,1) = cobalt%fcadet_arag_btm(:,:)
+    temp_field(:,:,1) = fcadet_arag_btm(:,:)
     call g_tracer_set_values(tracer_list,'cadet_arag','btm_reservoir',0.0)
-    if (cobalt%id_fcadet_arag_btm .gt. 0)           &
-         used = g_send_data(cobalt%id_fcadet_arag_btm,cobalt%fcadet_arag_btm, &
+    if (id_fcadet_arag_btm .gt. 0)           &
+         used = g_send_data(id_fcadet_arag_btm,fcadet_arag_btm, &
          model_time, rmask = grid_tmask(:,:,1),&
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
 
-    call g_tracer_get_values(tracer_list,'cadet_calc','btm_reservoir',cobalt%fcadet_calc_btm,isd,jsd)
-    cobalt%fcadet_calc_btm = cobalt%fcadet_calc_btm/dt
+    call g_tracer_get_values(tracer_list,'cadet_calc','btm_reservoir',fcadet_calc_btm,isd,jsd)
+    fcadet_calc_btm = fcadet_calc_btm/dt
     call g_tracer_get_pointer(tracer_list,'cadet_calc_btf','field',temp_field)
-    temp_field(:,:,1) = cobalt%fcadet_calc_btm(:,:)
+    temp_field(:,:,1) = fcadet_calc_btm(:,:)
     call g_tracer_set_values(tracer_list,'cadet_calc','btm_reservoir',0.0)
-    if (cobalt%id_fcadet_calc_btm .gt. 0)           &
-         used = g_send_data(cobalt%id_fcadet_calc_btm, cobalt%fcadet_calc_btm, &
+    if (id_fcadet_calc_btm .gt. 0)           &
+         used = g_send_data(id_fcadet_calc_btm, fcadet_calc_btm, &
          model_time, rmask = grid_tmask(:,:,1), &
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
     !
     ! Iron is buried, but can re-enter the water column in association with
     ! organic matter degradation (see ffe_sed in update_from_source)
     !
-    call g_tracer_get_values(tracer_list,'fedet','btm_reservoir',cobalt%ffedet_btm,isd,jsd)
-    cobalt%ffedet_btm = cobalt%ffedet_btm/dt
+    call g_tracer_get_values(tracer_list,'fedet','btm_reservoir',ffedet_btm,isd,jsd)
+    ffedet_btm = ffedet_btm/dt
     ! uncomment for "no mass change check"
     !call g_tracer_get_pointer(tracer_list,'fedet_btf','field',temp_field)
-    !temp_field(:,:,1) = cobalt%ffedet_btm(:,:)
+    !temp_field(:,:,1) = ffedet_btm(:,:)
     call g_tracer_set_values(tracer_list,'fedet','btm_reservoir',0.0)
-    if (cobalt%id_ffedet_btm .gt. 0)           &
-         used = g_send_data(cobalt%id_ffedet_btm, cobalt%ffedet_btm, &
+    if (id_ffedet_btm .gt. 0)           &
+         used = g_send_data(id_ffedet_btm, ffedet_btm, &
          model_time, rmask = grid_tmask(:,:,1), &
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
     !
     ! Lithogenic material is buried
     !
-    call g_tracer_get_values(tracer_list,'lithdet','btm_reservoir',cobalt%flithdet_btm,isd,jsd)
-    cobalt%flithdet_btm = cobalt%flithdet_btm /dt
+    call g_tracer_get_values(tracer_list,'lithdet','btm_reservoir',flithdet_btm,isd,jsd)
+    flithdet_btm = flithdet_btm /dt
     call g_tracer_get_pointer(tracer_list,'lithdet_btf','field',temp_field)
-    temp_field(:,:,1) = cobalt%flithdet_btm(:,:)
+    temp_field(:,:,1) = flithdet_btm(:,:)
     call g_tracer_set_values(tracer_list,'lithdet','btm_reservoir',0.0)
-    if (cobalt%id_flithdet_btm .gt. 0)           &
-         used = g_send_data(cobalt%id_flithdet_btm, cobalt%flithdet_btm, &
+    if (id_flithdet_btm .gt. 0)           &
+         used = g_send_data(id_flithdet_btm, flithdet_btm, &
          model_time, rmask = grid_tmask(:,:,1),&
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
     !
     ! N, P, and Si detritus that hits the bottom is re-entered as a bottom source of 
     ! nh4, po4, and SiO4 respectively
     !
-    call g_tracer_get_values(tracer_list,'ndet','btm_reservoir',cobalt%fndet_btm,isd,jsd)
-    cobalt%fndet_btm = cobalt%fndet_btm/dt
+    call g_tracer_get_values(tracer_list,'ndet','btm_reservoir',fndet_btm,isd,jsd)
+    fndet_btm = fndet_btm/dt
     call g_tracer_get_pointer(tracer_list,'ndet_btf','field',temp_field)
-    temp_field(:,:,1) = cobalt%fndet_btm(:,:)
+    temp_field(:,:,1) = fndet_btm(:,:)
     call g_tracer_set_values(tracer_list,'ndet','btm_reservoir',0.0)
-    if (cobalt%id_fndet_btm .gt. 0)           &
-         used = g_send_data(cobalt%id_fndet_btm,cobalt%fndet_btm,          &
+    if (id_fndet_btm .gt. 0)           &
+         used = g_send_data(id_fndet_btm,fndet_btm,          &
          model_time, rmask = grid_tmask(:,:,1),&
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
 
-    call g_tracer_get_values(tracer_list,'pdet','btm_reservoir',cobalt%fpdet_btm,isd,jsd)
-    cobalt%fpdet_btm = cobalt%fpdet_btm/dt
+    call g_tracer_get_values(tracer_list,'pdet','btm_reservoir',fpdet_btm,isd,jsd)
+    fpdet_btm = fpdet_btm/dt
     call g_tracer_get_pointer(tracer_list,'pdet_btf','field',temp_field)
-    temp_field(:,:,1) = cobalt%fpdet_btm(:,:)
+    temp_field(:,:,1) = fpdet_btm(:,:)
     call g_tracer_set_values(tracer_list,'pdet','btm_reservoir',0.0)
-    if (cobalt%id_fpdet_btm .gt. 0)           &
-         used = g_send_data(cobalt%id_fpdet_btm,cobalt%fpdet_btm,          &
+    if (id_fpdet_btm .gt. 0)           &
+         used = g_send_data(id_fpdet_btm,fpdet_btm,          &
          model_time, rmask = grid_tmask(:,:,1),&
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
 
-    call g_tracer_get_values(tracer_list,'sidet','btm_reservoir',cobalt%fsidet_btm,isd,jsd)
-    cobalt%fsidet_btm = cobalt%fsidet_btm/dt
+    call g_tracer_get_values(tracer_list,'sidet','btm_reservoir',fsidet_btm,isd,jsd)
+    fsidet_btm = fsidet_btm/dt
     call g_tracer_get_pointer(tracer_list,'sidet_btf','field',temp_field)
-    temp_field(:,:,1) = cobalt%fsidet_btm(:,:)
+    temp_field(:,:,1) = fsidet_btm(:,:)
     call g_tracer_set_values(tracer_list,'sidet','btm_reservoir',0.0)
-    if (cobalt%id_fsidet_btm .gt. 0)           &
-         used = g_send_data(cobalt%id_fsidet_btm,    cobalt%fsidet_btm,          &
+    if (id_fsidet_btm .gt. 0)           &
+         used = g_send_data(id_fsidet_btm,    fsidet_btm,          &
          model_time, rmask = grid_tmask(:,:,1),&
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
 
-  end subroutine CBED_updiate_from_bottom
+  end subroutine CBED_update_from_bottom
 
 end module generic_COBALT_update_from_bottom_mod
