@@ -6,8 +6,6 @@ module generic_COBALT_update_from_bottom_mod
   use g_tracer_utils, only : g_tracer_set_values, g_tracer_get_values
   use g_tracer_utils, only : g_tracer_get_pointer, g_send_data
 
-  use generic_COBALT, only : generic_COBALT_type
-
 implicit none ; private
 
 public generic_COBALT_update_from_bottom_simple_slab
@@ -56,7 +54,7 @@ contains
     integer,              intent(in) :: id_fcadet_calc_btm
     real, dimension(:,:), intent(inout) :: ffedet_btm
     integer,              intent(in) :: id_ffedet_btm
-    real, dimension(:,:), intent(inout) :: flithdet_bt
+    real, dimension(:,:), intent(inout) :: flithdet_btm
     integer,              intent(in) :: id_flithdet_btm
     real, dimension(:,:), intent(inout) :: fndet_btm
     integer,              intent(in) :: id_fndet_btm
@@ -187,7 +185,7 @@ contains
   !  </IN>
   !
   ! </SUBROUTINE>
-  subroutine CBED_update_from_bottom(cobalt, tracer_list, dt, tau, model_time, fcadet_arag_btm, id_fcadet_arag_btm, fcadet_calc_btm, id_fcadet_calc_btm, ffedet_btm, id_ffedet_btm, flithdet_btm, id_flithdet_btm, fndet_btm, id_fndet_btm, fpdet_btm, id_fpdet_btm, fsidet_btm, id_fsidet_btm)
+  subroutine CBED_update_from_bottom(tracer_list, dt, tau, model_time, fcadet_arag_btm, id_fcadet_arag_btm, fcadet_calc_btm, id_fcadet_calc_btm, ffedet_btm, id_ffedet_btm, flithdet_btm, id_flithdet_btm, fndet_btm, id_fndet_btm, fpdet_btm, id_fpdet_btm, fsidet_btm, id_fsidet_btm)
     type(g_tracer_type), pointer :: tracer_list
     real,               intent(in) :: dt
     integer,            intent(in) :: tau
@@ -198,7 +196,7 @@ contains
     integer,              intent(in) :: id_fcadet_calc_btm
     real, dimension(:,:), intent(inout) :: ffedet_btm
     integer,              intent(in) :: id_ffedet_btm
-    real, dimension(:,:), intent(inout) :: flithdet_bt
+    real, dimension(:,:), intent(inout) :: flithdet_btm
     integer,              intent(in) :: id_flithdet_btm
     real, dimension(:,:), intent(inout) :: fndet_btm
     integer,              intent(in) :: id_fndet_btm
