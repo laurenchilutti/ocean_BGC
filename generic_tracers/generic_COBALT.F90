@@ -6395,6 +6395,7 @@ write (stdlogunit, generic_COBALT_nml)
     real :: imbal
     integer :: stdoutunit, imbal_flag, outunit
 
+    type(COBALT_btm_type) :: cobalt_btm
     real, dimension(:,:), pointer :: fcadet_calc_btm, ffedet_btm
 
 
@@ -9184,8 +9185,8 @@ write (stdlogunit, generic_COBALT_nml)
 !--------------------------------------------------------------------
 !  Get fields from bottom needed in calculations below
 
-    call COBALT_btm_type%get_fcadet_calc_btm(fcadet_calc_btm)
-    call COBALT_btm_type%get_ffedet_btm(ffedet_btm)
+    call cobalt_btm%get_fcadet_calc_btm(fcadet_calc_btm)
+    call cobalt_btm%get_ffedet_btm(ffedet_btm)
 
 !
 !---------------------------------------------------------------------
