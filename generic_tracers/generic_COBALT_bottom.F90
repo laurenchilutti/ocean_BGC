@@ -17,7 +17,7 @@ public deallocate_cobalt_btm
 public generic_COBALT_btm_register_diag
 public generic_COBALT_btm_update_from_source
 
-type :: COBALT_btm_type
+type, public :: COBALT_btm_type
   real, dimension(:,:), ALLOCATABLE, private :: &
        fcadet_arag_btm, &
        fcadet_calc_btm, & ! Used in L 11445
