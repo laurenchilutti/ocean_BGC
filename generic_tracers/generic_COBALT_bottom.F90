@@ -41,6 +41,7 @@ end type COBALT_btm_type
 
 type vardesc
   character(len=fm_string_len) :: name     ! The variable name in a NetCDF file.
+  character(len=fm_string_len) :: longname ! The long name of that variable.
   character(len=1)  :: hor_grid ! The hor. grid:  u, v, h, q, or 1.
   character(len=1)  :: z_grid   ! The vert. grid:  L, i, or 1.
   character(len=1)  :: t_grid   ! The time description: s, a, m, or 1.
