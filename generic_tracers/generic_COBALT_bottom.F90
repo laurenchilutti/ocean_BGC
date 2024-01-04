@@ -56,7 +56,7 @@ contains
     class(COBALT_btm_type), intent(in) :: self
     real, dimension(:,:), pointer, intent(out) :: fcadet_calc_btm
 
-    fcadet_calc_btm => self%fcadet_calc_btm
+    fcadet_calc_btm = self%fcadet_calc_btm
 
   end subroutine get_fcadet_calc_btm
 
@@ -65,7 +65,7 @@ contains
     class(COBALT_btm_type), intent(in) :: self
     real, dimension(:,:), pointer, intent(out) :: ffedet_btm
 
-    ffedet_btm => self%ffedet_btm
+    ffedet_btm = self%ffedet_btm
 
   end subroutine get_ffedet_btm
 
