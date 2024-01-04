@@ -16,10 +16,9 @@ public allocate_cobalt_btm
 public deallocate_cobalt_btm
 public generic_COBALT_btm_register_diag
 public generic_COBALT_btm_update_from_source
-public get_from_bottom
 
 type :: COBALT_btm_type
-  real, dimension(:,:), ALLOCATABLE :: &
+  real, dimension(:,:), ALLOCATABLE, private :: &
        fcadet_arag_btm, &
        fcadet_calc_btm, & ! Used in L 11445
        ffedet_btm, & ! used in L 11489
@@ -27,7 +26,7 @@ type :: COBALT_btm_type
        fndet_btm, &
        fpdet_btm, &
        fsidet_btm
-  integer :: &
+  integer, private :: &
        id_fcadet_arag_btm = -1, &
        id_fcadet_calc_btm = -1, &
        id_ffedet_btm      = -1, &
@@ -35,6 +34,9 @@ type :: COBALT_btm_type
        id_fndet_btm       = -1, &
        id_fpdet_btm       = -1, &
        id_fsidet_btm      = -1
+  contains
+    procedure, public :: get_fcadet_calc_btm
+    procedure, public :: get_ffedet_btm
 end type COBALT_btm_type
 
 type vardesc
@@ -50,13 +52,22 @@ type(COBALT_btm_type) :: cobalt_btm
 
 contains
 
-  subroutine get_from_bottom(fcadet_calc_btm, ffedet_btm)
-    real, dimension(:,:), pointer, intent(inout) :: fcadet_calc_btm, ffedet_btm
+  subroutine get_fcadet_calc_btm(self, fcadet_calc_btm)
+    class(COBALT_btm_type), intent(in) :: self
+    real, dimension(:,:), pointer, intent(out) :: fcadet_calc_btm
 
-    fcadet_calc_btm => cobalt_btm%fcadet_calc_btm
-    ffedet_btm => cobalt_btm%ffedet_btm
+    fcadet_calc_btm => self%fcadet_calc_btm
 
-  end subroutine get_from_bottom
+  end subroutine get_fcadet_calc_btm
+
+
+  subroutine get_ffedet_btm(self, ffedet_btm)
+    class(COBALT_btm_type), intent(in) :: self
+    real, dimension(:,:), pointer, intent(out) :: ffedet_btm
+
+    ffedet_btm => self%ffedet_btm
+
+  end subroutine get_ffedet_btm
 
   subroutine generic_COBALT_btm_register_diag(package_name, missing_value1, axes, init_time)
     character(len=*), intent(in) :: package_name

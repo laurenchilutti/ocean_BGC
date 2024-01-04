@@ -153,7 +153,7 @@ module generic_COBALT
 
   use generic_COBALT_bottom, only : generic_COBALT_update_from_bottom_simple_slab
   use generic_COBALT_bottom, only : CBED_update_from_bottom
-  use generic_COBALT_bottom, only : allocate_cobalt_btm, deallocate_cobalt_btm, get_from_bottom
+  use generic_COBALT_bottom, only : allocate_cobalt_btm, deallocate_cobalt_btm, COBALT_btm_type
   use generic_COBALT_bottom, only : generic_COBALT_btm_register_diag, generic_COBALT_btm_update_from_source
 
   implicit none ; private
@@ -9184,7 +9184,8 @@ write (stdlogunit, generic_COBALT_nml)
 !--------------------------------------------------------------------
 !  Get fields from bottom needed in calculations below
 
-    call get_from_bottom(fcadet_calc_btm, ffedet_btm)
+    call COBALT_btm_type%get_fcadet_calc_btm(fcadet_calc_btm)
+    call COBALT_btm_type%get_ffedet_btm(ffedet_btm)
 
 !
 !---------------------------------------------------------------------
