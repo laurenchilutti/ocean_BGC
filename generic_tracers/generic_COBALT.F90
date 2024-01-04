@@ -140,6 +140,7 @@ module generic_COBALT
 
   use g_tracer_utils, only : g_tracer_type,g_tracer_start_param_list,g_tracer_end_param_list
   use g_tracer_utils, only : g_tracer_add,g_tracer_add_param, g_tracer_set_files
+
   use g_tracer_utils, only : g_tracer_set_values,g_tracer_get_pointer
   use g_tracer_utils, only : g_tracer_get_common,g_tracer_set_common 
   use g_tracer_utils, only : g_tracer_coupler_set,g_tracer_coupler_get
@@ -150,8 +151,10 @@ module generic_COBALT
 
   use FMS_ocmip2_co2calc_mod, only : FMS_ocmip2_co2calc, CO2_dope_vector
 
-  use generic_COBALT_update_from_bottom_mod, only : generic_COBALT_update_from_bottom_simple_slab
-  use generic_COBALT_update_from_bottom_mod, only : CBED_update_from_bottom
+  use generic_COBALT_bottom, only : generic_COBALT_update_from_bottom_simple_slab
+  use generic_COBALT_bottom, only : CBED_update_from_bottom
+  use generic_COBALT_bottom, only : allocate_cobalt_btm, deallocate_cobalt_btm, get_from_bottom
+  use generic_COBALT_bottom, only : generic_COBALT_btm_register_diag, generic_COBALT_btm_update_from_source
 
   implicit none ; private
 !-----------------------------------------------------------------------
@@ -836,13 +839,6 @@ namelist /generic_COBALT_nml/ do_14c, co2_calc, debug, do_nh3_atm_ocean_exchange
           b_alk,b_dic,b_fed,b_nh4,b_no3,b_o2,b_po4,b_sio4,b_di14c,&	! bottom flux terms
           co2_csurf,pco2_csurf,co2_alpha,c14o2_csurf,c14o2_alpha,&
           nh3_csurf,nh3_alpha,pnh3_csurf,&
-          fcadet_arag_btm,&
-          fcadet_calc_btm,&
-          ffedet_btm,&
-          flithdet_btm,&
-          fpdet_btm,&
-          fndet_btm,&
-          fsidet_btm,&      
           fcased_burial,&
           fcased_redis,&
           fcased_redis_surfresp,&
@@ -1128,13 +1124,6 @@ namelist /generic_COBALT_nml/ do_14c, co2_calc, debug, do_nh3_atm_ocean_exchange
           id_fpdet         = -1,       &
           id_fsidet        = -1,       & 
           id_flithdet      = -1,       &
-          id_fcadet_arag_btm = -1,     &
-          id_fcadet_calc_btm = -1,     &
-          id_ffedet_btm    = -1,       &
-          id_flithdet_btm  = -1,       &
-          id_fndet_btm     = -1,       &
-          id_fpdet_btm     = -1,       &
-          id_fsidet_btm    = -1,       &
           id_fcased_burial = -1,       &
           id_fcased_redis  = -1,       &
           id_fcased_redis_surfresp  = -1, &
@@ -1561,6 +1550,10 @@ write (stdlogunit, generic_COBALT_nml)
     write (stdoutunit,*) trim(note_header), 'Using Mocsy CO2 routine'
   else
     call mpp_error(FATAL,"Unknown co2_calc option specified in generic_COBALT_nml")
+  endif
+
+  if (do_CBED) then
+    write (stdoutunit,*) trim(note_header), 'Using CBED for modeling the bottom layer'
   endif
     !Specify all prognostic and diagnostic tracers of this modules.
     call user_add_tracers(tracer_list)
@@ -2858,14 +2851,6 @@ write (stdlogunit, generic_COBALT_nml)
     ! 2D sinking, bottom source/sink and burial diagnostics
     !
 
-    vardesc_temp = vardesc("fcadet_arag_btm","CaCO3 sinking flux at bottom",'h','1','s','mol m-2 s-1','f')
-    cobalt%id_fcadet_arag_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
-         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
-
-    vardesc_temp = vardesc("fcadet_calc_btm","CaCO3 sinking flux at bottom",'h','1','s','mol m-2 s-1','f')
-    cobalt%id_fcadet_calc_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
-         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
-
     vardesc_temp = vardesc("fcased_burial","CaCO3 permanent burial flux",'h','1','s','mol m-2 s-1','f')
     cobalt%id_fcased_burial = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
@@ -2886,10 +2871,6 @@ write (stdlogunit, generic_COBALT_nml)
     cobalt%id_cased_redis_delz = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
-    vardesc_temp = vardesc("ffedet_btm","fedet sinking flux burial",'h','1','s','mol m-2 s-1','f')
-    cobalt%id_ffedet_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
-         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
-
     vardesc_temp = vardesc("ffe_sed","Sediment iron efflux",'h','1','s','mol m-2 s-1','f')
     cobalt%id_ffe_sed = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
@@ -2902,14 +2883,6 @@ write (stdlogunit, generic_COBALT_nml)
     cobalt%id_ffe_iceberg = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
-    vardesc_temp = vardesc("flithdet_btm","Lithogenic detrital sinking flux burial",'h','1','s','g m-2 s-1','f')
-    cobalt%id_flithdet_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
-         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
-
-    vardesc_temp = vardesc("fndet_btm","ndet sinking flux to bottom",'h','1','s','mol m-2 s-1','f')
-    cobalt%id_fndet_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
-         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
-
     vardesc_temp = vardesc("fnfeso4red_sed","Sediment Ndet Fe and SO4 reduction flux",'h','1','s','mol m-2 s-1','f')
     cobalt%id_fnfeso4red_sed = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
@@ -2920,14 +2893,6 @@ write (stdlogunit, generic_COBALT_nml)
 
     vardesc_temp = vardesc("fnoxic_sed","Sediment oxic Ndet remineralization flux",'h','1','s','mol m-2 s-1','f')
     cobalt%id_fnoxic_sed = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
-         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
-
-    vardesc_temp = vardesc("fpdet_btm","pdet sinking flux to bottom",'h','1','s','mol m-2 s-1','f')
-    cobalt%id_fpdet_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
-         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
-
-    vardesc_temp = vardesc("fsidet_btm","sidet sinking flux to bottom",'h','1','s','mol m-2 s-1','f')
-    cobalt%id_fsidet_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("frac_burial","fraction of organic matter buried",'h','1','s','dimensionless','f')
@@ -5150,6 +5115,10 @@ write (stdlogunit, generic_COBALT_nml)
 
 ! previously defined above
 
+!------------------------------------------------------------------------------------------------------------------
+! Bottom fields
+
+    call generic_COBALT_btm_register_diag(package_name, missing_value1, axes, init_time)
 
 !==============================================================================================================
 
@@ -6305,10 +6274,12 @@ write (stdlogunit, generic_COBALT_nml)
     real, dimension(:,:,:),pointer :: grid_tmask
     real, dimension(:,:,:),pointer :: temp_field
 
+
+
     if (do_CBED) then
-      call CBED_update_from_bottom(tracer_list, dt, tau, model_time, cobalt%fcadet_arag_btm, cobalt%id_fcadet_arag_btm, cobalt%fcadet_calc_btm, cobalt%id_fcadet_calc_btm, cobalt%ffedet_btm, cobalt%id_ffedet_btm, cobalt%flithdet_btm, cobalt%id_flithdet_btm, cobalt%fndet_btm, cobalt%id_fndet_btm, cobalt%fpdet_btm, cobalt%id_fpdet_btm, cobalt%fsidet_btm, cobalt%id_fsidet_btm)
+      call CBED_update_from_bottom(tracer_list, dt, tau, model_time)
     else
-      call generic_COBALT_update_from_bottom_simple_slab(tracer_list, dt, tau, model_time, cobalt%fcadet_arag_btm, cobalt%id_fcadet_arag_btm, cobalt%fcadet_calc_btm, cobalt%id_fcadet_calc_btm, cobalt%ffedet_btm, cobalt%id_ffedet_btm, cobalt%flithdet_btm, cobalt%id_flithdet_btm, cobalt%fndet_btm, cobalt%id_fndet_btm, cobalt%fpdet_btm, cobalt%id_fpdet_btm, cobalt%fsidet_btm, cobalt%id_fsidet_btm)
+      call generic_COBALT_update_from_bottom_simple_slab(tracer_list, dt, tau, model_time)
     endif
 
   end subroutine generic_COBALT_update_from_bottom
@@ -6423,6 +6394,8 @@ write (stdlogunit, generic_COBALT_nml)
 
     real :: imbal
     integer :: stdoutunit, imbal_flag, outunit
+
+    real, dimension(:,:), pointer :: fcadet_calc_btm, ffedet_btm
 
 
     r_dt = 1.0 / dt
@@ -9207,6 +9180,12 @@ write (stdlogunit, generic_COBALT_nml)
     end if
     if (allocated(pka_nh3)) deallocate(pka_nh3)
     deallocate(phos_nh3_exchange)
+
+!--------------------------------------------------------------------
+!  Get fields from bottom needed in calculations below
+
+    call get_from_bottom(fcadet_calc_btm, ffedet_btm)
+
 !
 !---------------------------------------------------------------------
 !
@@ -9688,34 +9667,6 @@ write (stdlogunit, generic_COBALT_nml)
          used = g_send_data(cobalt%id_nh3_alpha,      cobalt%nh3_alpha,              &
          model_time, rmask = grid_tmask(:,:,1),& 
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
-    if (cobalt%id_fcadet_arag_btm .gt. 0)           &  
-         used = g_send_data(cobalt%id_fcadet_arag_btm,   cobalt%fcadet_arag_btm,      &
-         model_time, rmask = grid_tmask(:,:,1),&  
-         is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
-    if (cobalt%id_fcadet_calc_btm .gt. 0)           &
-         used = g_send_data(cobalt%id_fcadet_calc_btm,   cobalt%fcadet_calc_btm,      &
-         model_time, rmask = grid_tmask(:,:,1),&
-         is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
-    if (cobalt%id_ffedet_btm .gt. 0)           &
-         used = g_send_data(cobalt%id_ffedet_btm,   cobalt%ffedet_btm,             &
-         model_time, rmask = grid_tmask(:,:,1),&  
-         is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
-    if (cobalt%id_fndet_btm .gt. 0)            &
-         used = g_send_data(cobalt%id_fndet_btm,    cobalt%fndet_btm,              &
-         model_time, rmask = grid_tmask(:,:,1),&  
-         is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
-    if (cobalt%id_fpdet_btm .gt. 0)            &
-         used = g_send_data(cobalt%id_fpdet_btm,    cobalt%fpdet_btm,              &
-         model_time, rmask = grid_tmask(:,:,1),&  
-         is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
-    if (cobalt%id_fsidet_btm .gt. 0)           &
-         used = g_send_data(cobalt%id_fsidet_btm,   cobalt%fsidet_btm,             &
-         model_time, rmask = grid_tmask(:,:,1),&
-         is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
-    if (cobalt%id_flithdet_btm .gt. 0)           &
-         used = g_send_data(cobalt%id_flithdet_btm,   cobalt%flithdet_btm,             &
-         model_time, rmask = grid_tmask(:,:,1),&
-         is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
     if (cobalt%id_fcased_burial .gt. 0)        &
          used = g_send_data(cobalt%id_fcased_burial, cobalt%fcased_burial,         &
          model_time, rmask = grid_tmask(:,:,1),&
@@ -11508,7 +11459,7 @@ write (stdlogunit, generic_COBALT_nml)
 
 ! CAS: Updated based on 7/19 e-mails with jpd and jgj
     if (cobalt%id_fric .gt. 0)            &
-        used = g_send_data(cobalt%id_fric,  cobalt%fcadet_calc_btm -  cobalt%fcased_redis,  &
+        used = g_send_data(cobalt%id_fric,  fcadet_calc_btm -  cobalt%fcased_redis,  &
         model_time, rmask = grid_tmask(:,:,1),&
         is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
 
@@ -11552,7 +11503,7 @@ write (stdlogunit, generic_COBALT_nml)
         is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
 
     if (cobalt%id_frfe .gt. 0)            &
-        used = g_send_data(cobalt%id_frfe,  cobalt%ffedet_btm,   &
+        used = g_send_data(cobalt%id_frfe,  ffedet_btm,   &
         model_time, rmask = grid_tmask(:,:,1),&
         is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
 
@@ -11717,6 +11668,10 @@ write (stdlogunit, generic_COBALT_nml)
         used = g_send_data(cobalt%id_jalk_100,  cobalt%jalk_100,   &
         model_time, rmask = grid_tmask(:,:,1),&
         is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+
+!==============================================================================================================
+! Send data for bottom layer
+    call generic_COBALT_btm_update_from_source(model_time, grid_tmask, isc, jsc, iec, jec)
 
 !==============================================================================================================
 
@@ -12397,13 +12352,6 @@ write (stdlogunit, generic_COBALT_nml)
     allocate(cobalt%nh3_csurf(isd:ied, jsd:jed))          ; cobalt%nh3_csurf=0.0
     allocate(cobalt%nh3_alpha(isd:ied, jsd:jed))          ; cobalt%nh3_alpha=0.0
     allocate(cobalt%pnh3_csurf(isd:ied, jsd:jed))         ; cobalt%pnh3_csurf=0.0
-    allocate(cobalt%fcadet_arag_btm(isd:ied, jsd:jed))    ; cobalt%fcadet_arag_btm=0.0
-    allocate(cobalt%fcadet_calc_btm(isd:ied, jsd:jed))    ; cobalt%fcadet_calc_btm=0.0
-    allocate(cobalt%ffedet_btm(isd:ied, jsd:jed))         ; cobalt%ffedet_btm=0.0
-    allocate(cobalt%flithdet_btm(isd:ied, jsd:jed))       ; cobalt%flithdet_btm=0.0
-    allocate(cobalt%fpdet_btm(isd:ied, jsd:jed))          ; cobalt%fpdet_btm=0.0
-    allocate(cobalt%fndet_btm(isd:ied, jsd:jed))          ; cobalt%fndet_btm=0.0
-    allocate(cobalt%fsidet_btm(isd:ied, jsd:jed))         ; cobalt%fsidet_btm=0.0
     allocate(cobalt%fcased_burial(isd:ied, jsd:jed))      ; cobalt%fcased_burial=0.0
     allocate(cobalt%fcased_redis(isd:ied, jsd:jed))       ; cobalt%fcased_redis=0.0  
     allocate(cobalt%fcased_redis_surfresp(isd:ied, jsd:jed)) ; cobalt%fcased_redis_surfresp=0.0
@@ -12418,6 +12366,9 @@ write (stdlogunit, generic_COBALT_nml)
     allocate(cobalt%frac_burial(isd:ied, jsd:jed))        ; cobalt%frac_burial=0.0
     allocate(cobalt%fndet_burial(isd:ied, jsd:jed))       ; cobalt%fndet_burial=0.0
     allocate(cobalt%fpdet_burial(isd:ied, jsd:jed))       ; cobalt%fpdet_burial=0.0
+!==============================================================================================================
+! Bottom Layer
+    call allocate_cobalt_btm(isd, ied, jsd, jed)
 !==============================================================================================================
 ! JGJ 2016/08/08 CMIP6 OcnBgchem 
     allocate(cobalt%dissoc(isd:ied, jsd:jed, 1:nk))        ; cobalt%dissoc=0.0
@@ -12878,13 +12829,6 @@ write (stdlogunit, generic_COBALT_nml)
     deallocate(cobalt%nh3_csurf)  
     deallocate(cobalt%pnh3_csurf)  
     deallocate(cobalt%nh3_alpha)  
-    deallocate(cobalt%fcadet_arag_btm)  
-    deallocate(cobalt%fcadet_calc_btm)  
-    deallocate(cobalt%ffedet_btm)  
-    deallocate(cobalt%flithdet_btm)  
-    deallocate(cobalt%fpdet_btm)  
-    deallocate(cobalt%fndet_btm)  
-    deallocate(cobalt%fsidet_btm)  
     deallocate(cobalt%fcased_burial)  
     deallocate(cobalt%fcased_redis)
     deallocate(cobalt%fcased_redis_surfresp)
@@ -12934,6 +12878,9 @@ write (stdlogunit, generic_COBALT_nml)
     deallocate(cobalt%z_sat_calc)
     deallocate(cobalt%mask_z_sat_arag)
     deallocate(cobalt%mask_z_sat_calc)
+!==============================================================================================================
+! Bottom Layer
+    call deallocate_cobalt_btm
 !==============================================================================================================
 ! JGJ 2016/08/08 CMIP6 OcnBgchem 
     deallocate(cobalt%f_alk_int_100)  
