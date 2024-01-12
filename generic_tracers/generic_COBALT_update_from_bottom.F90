@@ -16,8 +16,7 @@ public allocate_cobalt_btm
 public deallocate_cobalt_btm
 public generic_COBALT_btm_register_diag
 public generic_COBALT_btm_update_from_source
-public get_fcadet_calc_btm
-public get_ffedet_btm
+public get_from_btm
 
 type :: COBALT_btm_type
   real, dimension(:,:), ALLOCATABLE :: &
@@ -53,21 +52,20 @@ type(COBALT_btm_type) :: cobalt_btm
 
 contains
 
-  subroutine get_fcadet_calc_btm(fcadet_calc_btm)
+  ! subroutine get_from_btm will pass pointers to the following cobalt_btm variables:
+  ! cobalt_btm%fcadet_calc_btm and cobalt_btm%ffedet_btm
+  ! This subroutine can be used to pass any relevant data back to COBALT
+  subroutine get_from_btm(fcadet_calc_btm, ffedet_btm)
     real, dimension(:,:), pointer, intent(out) :: fcadet_calc_btm
-
-    fcadet_calc_btm => cobalt_btm%fcadet_calc_btm
-
-  end subroutine get_fcadet_calc_btm
-
-
-  subroutine get_ffedet_btm(ffedet_btm)
     real, dimension(:,:), pointer, intent(out) :: ffedet_btm
 
+    fcadet_calc_btm => cobalt_btm%fcadet_calc_btm
     ffedet_btm => cobalt_btm%ffedet_btm
 
-  end subroutine get_ffedet_btm
+  end subroutine get_from_btm
 
+  ! subroutine generic_COBALT_btm_register_diag will register diagnostic variables used in the
+  ! generic_COBALT_update_from_bottom_simple_slab and CBED_update_from_bottom subroutines
   subroutine generic_COBALT_btm_register_diag(package_name, missing_value1, axes, init_time)
     character(len=*), intent(in) :: package_name
     real            , intent(in) :: missing_value1
@@ -105,6 +103,8 @@ contains
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
   end subroutine generic_COBALT_btm_register_diag
 
+  ! Subroutine generic_COBALT_btm_update_from_source will do send_sata calls for bottom diagnostics
+  ! It is intended that this subroutine will be called whenever generic_COBALT_update_from_source is called
   subroutine generic_COBALT_btm_update_from_source(model_time, grid_tmask, isc, jsc, iec, jec)
     type(time_type)                , intent(in) :: model_time
     real, dimension(:,:,:) ,pointer, intent(in) :: grid_tmask
@@ -143,6 +143,9 @@ contains
 
   end subroutine generic_COBALT_btm_update_from_source
 
+  ! Subroutine allocate_cobalt_btm allocates the cobalt_btm_type variables. This is intended to be called
+  ! in the generic_COBALT_init subroutine. It is currently called in user_allocate_arrays which is called
+  ! from generic_COBALT_init
   subroutine allocate_cobalt_btm(isd, ied, jsd, jed)
     integer, intent(in) :: isd, ied, jsd, jed
 
@@ -155,6 +158,9 @@ contains
     allocate(cobalt_btm%fsidet_btm(isd:ied, jsd:jed))         ; cobalt_btm%fsidet_btm=0.0
   end subroutine allocate_cobalt_btm
 
+  ! Subroutine deallocate_cobalt_btm deallocates the cobalt_btm_type variables. This is intended to be
+  ! called in the generic_COBALT_end subroutine. It is currently called in user_deallocate_arrays which
+  ! is called from generic_COBALT_end
   subroutine deallocate_cobalt_btm()
 
     deallocate(cobalt_btm%fcadet_arag_btm)
@@ -166,6 +172,9 @@ contains
     deallocate(cobalt_btm%fsidet_btm)
   end subroutine deallocate_cobalt_btm
 
+  ! subroutine generic_COBALT_update_from_bottom_simple_slab is intended to remain as the simple slab
+  ! bottom layer model previously in COBALT.  generic_COBALT still has a generic_COBALT_update_from_bottom
+  ! subroutine in which this subroutine or the CBED_update_from_bottom subroutine are called
   subroutine generic_COBALT_update_from_bottom_simple_slab(tracer_list, dt, tau, model_time)
     type(g_tracer_type), pointer :: tracer_list
     real,               intent(in) :: dt
@@ -264,6 +273,9 @@ contains
 
   end subroutine generic_COBALT_update_from_bottom_simple_slab
 
+  ! subroutine CBED_update_from_bottom is intended to be modified to become the CBED bottom layer model
+  ! generic_COBALT still has a generic_COBALT_update_from_bottom subroutine in which this subroutine or
+  ! the generic_COBALT_update_from_bottom_simple_slab subroutine are called
   subroutine CBED_update_from_bottom(tracer_list, dt, tau, model_time)
     type(g_tracer_type), pointer :: tracer_list
     real,               intent(in) :: dt

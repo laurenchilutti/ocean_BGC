@@ -155,7 +155,7 @@ module generic_COBALT
   use generic_COBALT_bottom, only : CBED_update_from_bottom
   use generic_COBALT_bottom, only : allocate_cobalt_btm, deallocate_cobalt_btm
   use generic_COBALT_bottom, only : generic_COBALT_btm_register_diag, generic_COBALT_btm_update_from_source
-  use generic_COBALT_bottom, only : get_fcadet_calc_btm, get_ffedet_btm
+  use generic_COBALT_bottom, only : get_from_btm
 
   implicit none ; private
 !-----------------------------------------------------------------------
@@ -176,7 +176,6 @@ module generic_COBALT
   public generic_COBALT_set_boundary_values
   public generic_COBALT_end
   public as_param_cobalt
-  public generic_COBALT_type
 
   !The following variables for using this module 
   ! are overwritten by generic_tracer_nml namelist
@@ -835,6 +834,10 @@ namelist /generic_COBALT_nml/ do_14c, co2_calc, debug, do_nh3_atm_ocean_exchange
           tot_layer_int_dic
  
 !==============================================================================================================
+
+     real, dimension(:,:), pointer :: &
+         fcadet_calc_btm, &
+         ffedet_btm
 
      real, dimension(:,:), ALLOCATABLE :: &
           b_alk,b_dic,b_fed,b_nh4,b_no3,b_o2,b_po4,b_sio4,b_di14c,&	! bottom flux terms
@@ -6275,13 +6278,13 @@ write (stdlogunit, generic_COBALT_nml)
     real, dimension(:,:,:),pointer :: grid_tmask
     real, dimension(:,:,:),pointer :: temp_field
 
-
-
     if (do_CBED) then
       call CBED_update_from_bottom(tracer_list, dt, tau, model_time)
     else
       call generic_COBALT_update_from_bottom_simple_slab(tracer_list, dt, tau, model_time)
     endif
+
+    call get_from_btm(cobalt%fcadet_calc_btm, cobalt%ffedet_btm)
 
   end subroutine generic_COBALT_update_from_bottom
 
@@ -6395,8 +6398,6 @@ write (stdlogunit, generic_COBALT_nml)
 
     real :: imbal
     integer :: stdoutunit, imbal_flag, outunit
-
-    real, dimension(:,:), pointer :: fcadet_calc_btm, ffedet_btm
 
 
     r_dt = 1.0 / dt
@@ -9181,13 +9182,6 @@ write (stdlogunit, generic_COBALT_nml)
     end if
     if (allocated(pka_nh3)) deallocate(pka_nh3)
     deallocate(phos_nh3_exchange)
-
-!--------------------------------------------------------------------
-!  Get fields from bottom needed in calculations below
-
-    call get_fcadet_calc_btm(fcadet_calc_btm)
-    call get_ffedet_btm(ffedet_btm)
-
 !
 !---------------------------------------------------------------------
 !
@@ -11461,7 +11455,7 @@ write (stdlogunit, generic_COBALT_nml)
 
 ! CAS: Updated based on 7/19 e-mails with jpd and jgj
     if (cobalt%id_fric .gt. 0)            &
-        used = g_send_data(cobalt%id_fric,  fcadet_calc_btm -  cobalt%fcased_redis,  &
+        used = g_send_data(cobalt%id_fric,  cobalt%fcadet_calc_btm -  cobalt%fcased_redis,  &
         model_time, rmask = grid_tmask(:,:,1),&
         is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
 
@@ -11505,7 +11499,7 @@ write (stdlogunit, generic_COBALT_nml)
         is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
 
     if (cobalt%id_frfe .gt. 0)            &
-        used = g_send_data(cobalt%id_frfe,  ffedet_btm,   &
+        used = g_send_data(cobalt%id_frfe,  cobalt%ffedet_btm,   &
         model_time, rmask = grid_tmask(:,:,1),&
         is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
 
@@ -12371,6 +12365,7 @@ write (stdlogunit, generic_COBALT_nml)
 !==============================================================================================================
 ! Bottom Layer
     call allocate_cobalt_btm(isd, ied, jsd, jed)
+    call get_from_btm(cobalt%fcadet_calc_btm, cobalt%ffedet_btm)
 !==============================================================================================================
 ! JGJ 2016/08/08 CMIP6 OcnBgchem 
     allocate(cobalt%dissoc(isd:ied, jsd:jed, 1:nk))        ; cobalt%dissoc=0.0
