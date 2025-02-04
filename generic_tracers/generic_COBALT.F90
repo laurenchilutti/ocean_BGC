@@ -151,11 +151,8 @@ module generic_COBALT
 
   use FMS_ocmip2_co2calc_mod, only : FMS_ocmip2_co2calc, CO2_dope_vector
 
-  use generic_COBALT_bottom, only : generic_COBALT_update_from_bottom_simple_slab
-  use generic_COBALT_bottom, only : CBED_update_from_bottom
-  use generic_COBALT_bottom, only : allocate_cobalt_btm, deallocate_cobalt_btm
-  use generic_COBALT_bottom, only : generic_COBALT_btm_register_diag, generic_COBALT_btm_update_from_source
-  use generic_COBALT_bottom, only : get_from_btm
+  use generic_CBED, only : generic_CBED_sediments_update_from_bottom
+  use generic_CBED, only : generic_CBED_sediments_update_from_source
 
   implicit none ; private
 !-----------------------------------------------------------------------
@@ -835,14 +832,18 @@ namelist /generic_COBALT_nml/ do_14c, co2_calc, debug, do_nh3_atm_ocean_exchange
  
 !==============================================================================================================
 
-     real, dimension(:,:), pointer :: &
-         fcadet_calc_btm, &
-         ffedet_btm
-
      real, dimension(:,:), ALLOCATABLE :: &
           b_alk,b_dic,b_fed,b_nh4,b_no3,b_o2,b_po4,b_sio4,b_di14c,&	! bottom flux terms
           co2_csurf,pco2_csurf,co2_alpha,c14o2_csurf,c14o2_alpha,&
           nh3_csurf,nh3_alpha,pnh3_csurf,&
+          fcadet_arag_btm,&
+          fcadet_calc_btm,&
+          ffedet_btm,&
+          flithdet_btm,&
+          fpdet_btm,&
+          fndet_btm,&
+          fsidet_btm,&
+          ! add more diagnostics for CBED here
           fcased_burial,&
           fcased_redis,&
           fcased_redis_surfresp,&
@@ -1128,6 +1129,14 @@ namelist /generic_COBALT_nml/ do_14c, co2_calc, debug, do_nh3_atm_ocean_exchange
           id_fpdet         = -1,       &
           id_fsidet        = -1,       & 
           id_flithdet      = -1,       &
+          id_fcadet_arag_btm = -1,     &
+          id_fcadet_calc_btm = -1,     &
+          id_ffedet_btm    = -1,       &
+          id_flithdet_btm  = -1,       &
+          id_fndet_btm     = -1,       &
+          id_fpdet_btm     = -1,       &
+          id_fsidet_btm    = -1,       &
+          ! add more diagnostics for CBED here
           id_fcased_burial = -1,       &
           id_fcased_redis  = -1,       &
           id_fcased_redis_surfresp  = -1, &
@@ -5121,8 +5130,64 @@ write (stdlogunit, generic_COBALT_nml)
 
 !------------------------------------------------------------------------------------------------------------------
 ! Bottom fields
+    if (do_CBED) then
+      ! Remove any diagnostics that aren't needed in new CBED model and register any new diagnostics for CBED here:
+      vardesc_temp = vardesc("fcadet_arag_btm","CaCO3 sinking flux at bottom",'h','1','s','mol m-2 s-1','f')
+      cobalt%id_fcadet_arag_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
-    call generic_COBALT_btm_register_diag(package_name, missing_value1, axes, init_time)
+      vardesc_temp = vardesc("fcadet_calc_btm","CaCO3 sinking flux at bottom",'h','1','s','mol m-2 s-1','f')
+      cobalt%id_fcadet_calc_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+      vardesc_temp = vardesc("ffedet_btm","fedet sinking flux burial",'h','1','s','mol m-2 s-1','f')
+      cobalt%id_ffedet_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+      vardesc_temp = vardesc("flithdet_btm","Lithogenic detrital sinking flux burial",'h','1','s','g m-2 s-1','f')
+      cobalt%id_flithdet_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+      vardesc_temp = vardesc("fndet_btm","ndet sinking flux to bottom",'h','1','s','mol m-2 s-1','f')
+      cobalt%id_fndet_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+      vardesc_temp = vardesc("fpdet_btm","pdet sinking flux to bottom",'h','1','s','mol m-2 s-1','f')
+      cobalt%id_fpdet_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+      vardesc_temp = vardesc("fsidet_btm","sidet sinking flux to bottom",'h','1','s','mol m-2 s-1','f')
+      cobalt%id_fsidet_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+    else
+      vardesc_temp = vardesc("fcadet_arag_btm","CaCO3 sinking flux at bottom",'h','1','s','mol m-2 s-1','f')
+      cobalt%id_fcadet_arag_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+      vardesc_temp = vardesc("fcadet_calc_btm","CaCO3 sinking flux at bottom",'h','1','s','mol m-2 s-1','f')
+      cobalt%id_fcadet_calc_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+      vardesc_temp = vardesc("ffedet_btm","fedet sinking flux burial",'h','1','s','mol m-2 s-1','f')
+      cobalt%id_ffedet_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+      vardesc_temp = vardesc("flithdet_btm","Lithogenic detrital sinking flux burial",'h','1','s','g m-2 s-1','f')
+      cobalt%id_flithdet_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+      vardesc_temp = vardesc("fndet_btm","ndet sinking flux to bottom",'h','1','s','mol m-2 s-1','f')
+      cobalt%id_fndet_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+      vardesc_temp = vardesc("fpdet_btm","pdet sinking flux to bottom",'h','1','s','mol m-2 s-1','f')
+      cobalt%id_fpdet_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+      vardesc_temp = vardesc("fsidet_btm","sidet sinking flux to bottom",'h','1','s','mol m-2 s-1','f')
+      cobalt%id_fsidet_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+    endif
 
 !==============================================================================================================
 
@@ -6241,7 +6306,7 @@ write (stdlogunit, generic_COBALT_nml)
   end subroutine generic_COBALT_update_from_coupler
 
   ! <SUBROUTINE NAME="generic_COBALT_update_from_bottom">
-  ! 
+  !
   !  <OVERVIEW>
   !   Set values of bottom fluxes and reservoirs
   !  </OVERVIEW>
@@ -6279,14 +6344,139 @@ write (stdlogunit, generic_COBALT_nml)
     real, dimension(:,:,:),pointer :: temp_field
 
     if (do_CBED) then
-      call CBED_update_from_bottom(tracer_list, dt, tau, model_time)
+      call generic_CBED_sediments_update_from_bottom(cobalt%fcadet_arag_btm, cobalt%id_fcadet_arag_btm, &
+           cobalt%fcadet_calc_btm, cobalt%id_fcadet_calc_btm, cobalt%ffedet_btm, cobalt%id_ffedet_btm, &
+           cobalt%flithdet_btm, cobalt%id_flithdet_btm, cobalt%fndet_btm, cobalt%id_fndet_btm, &
+           cobalt%fpdet_btm, cobalt%id_fpdet_btm, cobalt%fsidet_btm, cobalt%id_fsidet_btm, &
+           tracer_list, dt, tau, model_time)
     else
-      call generic_COBALT_update_from_bottom_simple_slab(tracer_list, dt, tau, model_time)
+      call generic_COBALT_sediments_update_from_bottom(tracer_list, dt, tau, model_time)
     endif
 
     call get_from_btm(cobalt%fcadet_calc_btm, cobalt%ffedet_btm)
 
   end subroutine generic_COBALT_update_from_bottom
+
+  ! <SUBROUTINE NAME="generic_COBALT_sediments_update_from_bottom">
+  !
+  !  <OVERVIEW>
+  !
+  !  </OVERVIEW>
+  !
+  !  <DESCRIPTION>
+  !
+  !  </DESCRIPTION>
+  !
+  !  <TEMPLATE>
+  !   call generic_COBALT_sediments_update_from_bottom(tracer_list, dt, tau, model_time)
+  !  </TEMPLATE>
+  !
+  !  <IN NAME="tracer_list" TYPE="type(g_tracer_type), pointer">
+  !  </IN>
+  !  <IN NAME="dt" TYPE="real">
+  !   Time step increment
+  !  </IN>
+  !  <IN NAME="tau" TYPE="integer">
+  !   Time step index to be used for %field
+  !  </IN>
+  !
+  ! </SUBROUTINE>
+  subroutine generic_COBALT_sediments_update_from_bottom(tracer_list, dt, tau, model_time)
+    type(g_tracer_type), pointer :: tracer_list
+    real,               intent(in) :: dt
+    integer,            intent(in) :: tau
+    type(time_type),    intent(in) :: model_time
+
+    integer :: isc,iec, jsc,jec,isd,ied,jsd,jed,nk,ntau
+    logical :: used
+    real, dimension(:,:,:),pointer :: grid_tmask
+    real, dimension(:,:,:),pointer :: temp_field
+
+    call g_tracer_get_common(isc,iec,jsc,jec,isd,ied,jsd,jed,nk,ntau,grid_tmask=grid_tmask)
+
+    !
+    ! The bottom reservoirs of aragonite and calcite are immediately redistributed to the
+    ! water column as a bottom flux (btf) where they impact the alkalinity and DIC
+    !
+    call g_tracer_get_values(tracer_list,'cadet_arag','btm_reservoir',cobalt%fcadet_arag_btm,isd,jsd)
+    cobalt%fcadet_arag_btm = cobalt%fcadet_arag_btm/dt
+    call g_tracer_get_pointer(tracer_list,'cadet_arag_btf','field',temp_field)
+    temp_field(:,:,1) = cobalt%fcadet_arag_btm(:,:)
+    call g_tracer_set_values(tracer_list,'cadet_arag','btm_reservoir',0.0)
+    if (cobalt%id_fcadet_arag_btm .gt. 0)           &
+         used = g_send_data(cobalt%id_fcadet_arag_btm,cobalt%fcadet_arag_btm, &
+         model_time, rmask = grid_tmask(:,:,1),&
+         is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
+
+    call g_tracer_get_values(tracer_list,'cadet_calc','btm_reservoir',cobalt%fcadet_calc_btm,isd,jsd)
+    cobalt%fcadet_calc_btm = cobalt%fcadet_calc_btm/dt
+    call g_tracer_get_pointer(tracer_list,'cadet_calc_btf','field',temp_field)
+    temp_field(:,:,1) = cobalt%fcadet_calc_btm(:,:)
+    call g_tracer_set_values(tracer_list,'cadet_calc','btm_reservoir',0.0)
+    if (cobalt%id_fcadet_calc_btm .gt. 0)           &
+         used = g_send_data(cobalt%id_fcadet_calc_btm, cobalt%fcadet_calc_btm, &
+         model_time, rmask = grid_tmask(:,:,1), &
+         is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
+    !
+    ! Iron is buried, but can re-enter the water column in association with
+    ! organic matter degradation (see ffe_sed in update_from_source)
+    !
+    call g_tracer_get_values(tracer_list,'fedet','btm_reservoir',cobalt%ffedet_btm,isd,jsd)
+    cobalt%ffedet_btm = cobalt%ffedet_btm/dt
+    ! uncomment for "no mass change check"
+    !call g_tracer_get_pointer(tracer_list,'fedet_btf','field',temp_field)
+    !temp_field(:,:,1) = cobalt%ffedet_btm(:,:)
+    call g_tracer_set_values(tracer_list,'fedet','btm_reservoir',0.0)
+    if (cobalt%id_ffedet_btm .gt. 0)           &
+         used = g_send_data(cobalt%id_ffedet_btm, cobalt%ffedet_btm, &
+         model_time, rmask = grid_tmask(:,:,1), &
+         is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
+    !
+    ! Lithogenic material is buried
+    !
+    call g_tracer_get_values(tracer_list,'lithdet','btm_reservoir',cobalt%flithdet_btm,isd,jsd)
+    cobalt%flithdet_btm = cobalt%flithdet_btm /dt
+    call g_tracer_get_pointer(tracer_list,'lithdet_btf','field',temp_field)
+    temp_field(:,:,1) = cobalt%flithdet_btm(:,:)
+    call g_tracer_set_values(tracer_list,'lithdet','btm_reservoir',0.0)
+    if (cobalt%id_flithdet_btm .gt. 0)           &
+         used = g_send_data(cobalt%id_flithdet_btm, cobalt%flithdet_btm, &
+         model_time, rmask = grid_tmask(:,:,1),&
+         is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
+    !
+    ! N, P, and Si detritus that hits the bottom is re-entered as a bottom source of
+    ! nh4, po4, and SiO4 respectively
+    !
+    call g_tracer_get_values(tracer_list,'ndet','btm_reservoir',cobalt%fndet_btm,isd,jsd)
+    cobalt%fndet_btm = cobalt%fndet_btm/dt
+    call g_tracer_get_pointer(tracer_list,'ndet_btf','field',temp_field)
+    temp_field(:,:,1) = cobalt%fndet_btm(:,:)
+    call g_tracer_set_values(tracer_list,'ndet','btm_reservoir',0.0)
+    if (cobalt%id_fndet_btm .gt. 0)           &
+         used = g_send_data(cobalt%id_fndet_btm,cobalt%fndet_btm,          &
+         model_time, rmask = grid_tmask(:,:,1),&
+         is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
+
+    call g_tracer_get_values(tracer_list,'pdet','btm_reservoir',cobalt%fpdet_btm,isd,jsd)
+    cobalt%fpdet_btm = cobalt%fpdet_btm/dt
+    call g_tracer_get_pointer(tracer_list,'pdet_btf','field',temp_field)
+    temp_field(:,:,1) = cobalt%fpdet_btm(:,:)
+    call g_tracer_set_values(tracer_list,'pdet','btm_reservoir',0.0)
+    if (cobalt%id_fpdet_btm .gt. 0)           &
+         used = g_send_data(cobalt%id_fpdet_btm,cobalt%fpdet_btm,          &
+         model_time, rmask = grid_tmask(:,:,1),&
+         is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
+
+    call g_tracer_get_values(tracer_list,'sidet','btm_reservoir',cobalt%fsidet_btm,isd,jsd)
+    cobalt%fsidet_btm = cobalt%fsidet_btm/dt
+    call g_tracer_get_pointer(tracer_list,'sidet_btf','field',temp_field)
+    temp_field(:,:,1) = cobalt%fsidet_btm(:,:)
+    call g_tracer_set_values(tracer_list,'sidet','btm_reservoir',0.0)
+    if (cobalt%id_fsidet_btm .gt. 0)           &
+         used = g_send_data(cobalt%id_fsidet_btm,    cobalt%fsidet_btm,          &
+         model_time, rmask = grid_tmask(:,:,1),&
+         is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
+  end subroutine generic_COBALT_sediments_update_from_bottom
 
   ! <SUBROUTINE NAME="generic_COBALT_update_from_source">
   !  <OVERVIEW>
@@ -7687,179 +7877,24 @@ write (stdlogunit, generic_COBALT_nml)
 ! 8: Sedimentary/coastal fluxes/transformations
 !-------------------------------------------------------------------------------------------------
 !
-
-    !
-    ! Coastal iron input (default is 0)
-    !
-    !do k = 1, nk ; do j = jsc, jec ; do i = isc, iec   !{
-    !   cobalt%jfe_coast(i,j,k) = cobalt%fe_coast * mask_coast(i,j) * grid_tmask(i,j,k) / &
-    !        sqrt(grid_dat(i,j))
-    !     ! uncomment if running "no mass change" test
-    !     !cobalt%jfe_coast(i,j,k) = 0.0
-    !enddo; enddo; enddo  !} i,j,k
-
-    do j = jsc, jec; do i = isc, iec  !{
-       k = grid_kmt(i,j)
-       if (k .gt. 0) then !{
-          !
-          ! Nitrogen flux from the sediments
-          ! 
-          if (cobalt%f_ndet_btf(i,j,1) .gt. 0.0) then !{
-             ! fpoc_bottom in mmoles C m-2 day-1 for burial relationship
-             fpoc_btm = cobalt%f_ndet_btf(i,j,1)*cobalt%c_2_n*sperd*1000.0
-             !cobalt%frac_burial(i,j) = (0.013 + 0.53*fpoc_btm**2.0)/((7.0+fpoc_btm)**2.0)
-             cobalt%frac_burial(i,j) = 0.013 + 0.53*fpoc_btm**2.0/((7.0+fpoc_btm)**2.0) * &
-                  cobalt%zt(i,j,k) / (cobalt%z_burial + cobalt%zt(i,j,k))
-             ! uncomment for "no mass change" test
-             !cobalt%frac_burial(i,j) = 0.0
-             cobalt%fndet_burial(i,j) = cobalt%frac_burial(i,j)*cobalt%f_ndet_btf(i,j,1)
-             cobalt%fpdet_burial(i,j) = cobalt%frac_burial(i,j)*cobalt%f_pdet_btf(i,j,1)
-             ! fpoc_bottom in micromoles C cm-2 day-1 for denitrification relationship, cap at 43
-             ! to prevent anomalous extrapolation of the relationship
-             log_fpoc_btm = log(min(43.0,0.1*fpoc_btm))
-             cobalt%fno3denit_sed(i,j) = min(cobalt%f_no3(i,j,k)*cobalt%Rho_0*r_dt,  &      
-                  min((cobalt%f_ndet_btf(i,j,1)-cobalt%fndet_burial(i,j))*cobalt%n_2_n_denit, & 
-                  10.0**(-0.9543+0.7662*log_fpoc_btm - 0.235*log_fpoc_btm**2.0)/(cobalt%c_2_n*sperd*100.0)* &
-                  cobalt%n_2_n_denit*cobalt%f_no3(i,j,k)/(cobalt%k_no3_denit + cobalt%f_no3(i,j,k)))) * &
-                  cobalt%zt(i,j,k) / (cobalt%z_burial + cobalt%zt(i,j,k))
-             ! uncomment "no mass change" test 
-             !cobalt%fno3denit_sed(i,j) = 0.0             
-             if (cobalt%f_o2(i,j,k) .gt. cobalt%o2_min) then  !{
-                cobalt%fnoxic_sed(i,j) = max(0.0, min(cobalt%f_o2(i,j,k)*cobalt%Rho_0*r_dt*(1.0/cobalt%o2_2_nh4), &
-                                         cobalt%f_ndet_btf(i,j,1) - cobalt%fndet_burial(i,j) - &
-                                         cobalt%fno3denit_sed(i,j)/cobalt%n_2_n_denit))
-             else
-                cobalt%fnoxic_sed(i,j) = 0.0
-             endif !}
-             cobalt%fno3denit_sed(i,j) = cobalt%fno3denit_sed(i,j) + &
-                                         min(cobalt%f_no3(i,j,k)*cobalt%Rho_0*r_dt-cobalt%fno3denit_sed(i,j), &
-                                         (cobalt%f_ndet_btf(i,j,1)-cobalt%fnoxic_sed(i,j)-cobalt%fndet_burial(i,j) - &
-                                         cobalt%fno3denit_sed(i,j)/cobalt%n_2_n_denit)*cobalt%n_2_n_denit)
-             cobalt%fnfeso4red_sed(i,j) = max(0.0, cobalt%f_ndet_btf(i,j,1)-cobalt%fnoxic_sed(i,j)- &
-                                          cobalt%fndet_burial(i,j)-cobalt%fno3denit_sed(i,j)/cobalt%n_2_n_denit)
-          else
-             cobalt%fnfeso4red_sed(i,j) = 0.0
-             cobalt%fno3denit_sed(i,j) = 0.0
-             cobalt%fnoxic_sed(i,j) = 0.0
-          endif !}
-
-          ! iron from sediment (Elrod) 
-          !cobalt%ffe_sed(i,j) = cobalt%fe_2_n_sed * cobalt%f_ndet_btf(i,j,1)
-          ! iron from sediment (Dale)
-          cobalt%ffe_sed(i,j) = cobalt%ffe_sed_max * tanh( (cobalt%f_ndet_btf(i,j,1)*cobalt%c_2_n*sperd*1.0e3)/ &
-                                max(cobalt%f_o2(i,j,k)*1.0e6,epsln) )
-
-          cobalt%ffe_geotherm(i,j) = cobalt%ffe_geotherm_ratio*internal_heat(i,j)*4184.0/dt
-          ! default for icebergs: 40 nanomoles fe dissolved per kg of icemelt
-          ! sediments: Raiswell et al., 2008: 0.5 kg sed per m-3 of iceberg; 0.1% mean Fe, 5-10% soluble
-          ! ~500 nanomoles Fe per kg-1 icemelt 
-          cobalt%ffe_iceberg(i,j) = cobalt%ffe_iceberg_ratio*max(frunoff(i,j),0.0)
-          cobalt%jprod_fed(i,j,1) = cobalt%jprod_fed(i,j,1) + cobalt%ffe_iceberg(i,j)/rho_dzt(i,j,1) 
-
-          !
-          ! Calcium carbonate flux and burial
-          ! 2015/11/18 JGJ: fix from JPD to cap the absolute cased dissolution rate to 10 mmol m-2 d-1
-          ! Calcite cycling in the sediments is based on the model of   Dunne et al., 2012.
-          !
-          ! phi_surfresp_cased = 0.14307   ! const for enhanced diss., surf sed respiration (dimensionless)
-          ! phi_deepresp_cased = 4.1228    ! const for enhanced diss., deep sed respiration (dimensionless)
-          ! alpha_cased = 2.7488 ! exponent controlling non-linearity of deep dissolution           
-          ! beta_cased = -2.2185 ! exponent controlling non-linearity of effective thickness
-          ! gamma_cased = 0.03607/spery   ! dissolution rate constant
-          ! Co_cased = 8.1e3        ! moles CaCo3 m-3 for pure calcite sediment with porosity = 0.7
-          !
-          ! if cased_steady is true, burial is calculated from Dunne's eq. (2) assuming dcased/dt = 0.
-          ! This ensures that all the calcite bottom flux is partitioned between burial and redissolution.     
-          ! The steady state cased value of cased is calculated to reflect the changing bottom conditions.
-          ! This influences the the partitioning of burial and redissolution over time, but there are
-          ! no alkalinity changes/drifts associated with the long-term evolution of cased
-          ! 
-          ! If cased_steady is false, calcite is partitioned between dissolution, burial and evolving
-          ! cased as described in Dunne et al. (2012).  The multi-century scale evolution of cased
-          ! impacts alkalinity, but care must to ensure that cased starts in equilibrium with the 
-          ! mean ocean state to avoid unrealistic drifts. 
-
-          ! Enhanced dissolution by fast respiration near the sediment surface, proportional 
-          ! to organic flux, moles Ca m-2 s-1, limited to a max 1/2 the instantaneous calcite flux
-          cobalt%fcased_redis_surfresp(i,j)=min(0.5*cobalt%f_cadet_calc_btf(i,j,1), &
-            cobalt%phi_surfresp_cased*cobalt%f_ndet_btf(i,j,1)*cobalt%c_2_n)
-          ! Ca-specific dissolution coeficient, depends on calcite saturation state and is enhanced by
-          ! respiration deep in the sediment (s-1), non-linearity controlled by alpha_cased
-          cobalt%cased_redis_coef(i,j) = cobalt%gamma_cased*max(0.0,1.0-cobalt%omega_calc(i,j,k)+ &
-            cobalt%phi_deepresp_cased*cobalt%f_ndet_btf(i,j,1)*cobalt%c_2_n*spery)**cobalt%alpha_cased
-          ! Effective thickness term that enhances burial of calcite when total sediment accumulation is high
-          ! dimensionless value between 0 and 1
-          cobalt%cased_redis_delz(i,j) = max(1.0, &
-            cobalt%f_lithdet_btf(i,j,1)*spery+cobalt%f_cadet_calc_btf(i,j,1)*100.0*spery)**cobalt%beta_cased  
-          ! calculate the sediment redissolution rate (moles Ca m-2 sec-1). This calculation is subject to
-          ! three limiters: a) a maximum of 1/2 of the total cased over one time step; b) a maximum of 0.01
-          ! moles Ca per day; and c) a minimum of 0.0
-          cobalt%fcased_redis(i,j) = max(0.0, min(0.01/sperd, min(0.5*cobalt%f_cased(i,j,1)*r_dt,  &
-            cobalt%fcased_redis_surfresp(i,j)+cobalt%cased_redis_coef(i,j)*cobalt%cased_redis_delz(i,j)*cobalt%f_cased(i,j,1))) ) 
-          !
-          ! Old expression
-          !
-          !cobalt%fcased_redis(i,j) = max(0.0, min(0.01/sperd,min(0.5 * cobalt%f_cased(i,j,1) * r_dt, min(0.5 *       &                          
-          !   cobalt%f_cadet_calc_btf(i,j,1), 0.14307 * cobalt%f_ndet_btf(i,j,1) * cobalt%c_2_n) +        &
-          !   0.03607 / spery * max(0.0, 1.0 - cobalt%omega_calc(i,j,k) +   &
-          !   4.1228 * cobalt%f_ndet_btf(i,j,1) * cobalt%c_2_n * spery)**(2.7488) *                        &
-          !   max(1.0, cobalt%f_lithdet_btf(i,j,1) * spery + cobalt%f_cadet_calc_btf(i,j,1) * 100.0 *  &
-          !   spery)**(-2.2185) * cobalt%f_cased(i,j,1))))*grid_tmask(i,j,k)
-
-          if (cobalt%cased_steady) then
-            cobalt%fcased_burial(i,j) = cobalt%f_cadet_calc_btf(i,j,1) - cobalt%fcased_redis(i,j)
-            cobalt%f_cased(i,j,1) = cobalt%fcased_burial(i,j)*cobalt%Co_cased/cobalt%f_cadet_calc_btf(i,j,1)
-          else
-            cobalt%fcased_burial(i,j) = max(0.0, cobalt%f_cadet_calc_btf(i,j,1) * cobalt%f_cased(i,j,1) / &
-              cobalt%Co_cased)
-            cobalt%f_cased(i,j,1) = cobalt%f_cased(i,j,1) + (cobalt%f_cadet_calc_btf(i,j,1) -            &
-              cobalt%fcased_redis(i,j) - cobalt%fcased_burial(i,j)) / cobalt%z_sed * dt *                &
-              grid_tmask(i,j,k)
-          endif
-
-          ! uncomment for "no mass change" test (next 3 lines)
-          !cobalt%fcased_redis(i,j) = cobalt%f_cadet_calc_btf(i,j,1)
-          !cobalt%fcased_burial(i,j) = 0.0
-          !cobalt%f_cased(i,j,1) = cobalt%f_cased(i,j,1)
-          !
-          ! Bottom flux boundaries passed to the vertical mixing routine 
-          !
-
-          cobalt%b_alk(i,j) = - 2.0*(cobalt%fcased_redis(i,j)+cobalt%f_cadet_arag_btf(i,j,1)) -    &
-             cobalt%fnoxic_sed(i,j) - cobalt%fno3denit_sed(i,j)*cobalt%alk_2_n_denit
-          cobalt%b_dic(i,j) =  - cobalt%fcased_redis(i,j) - cobalt%f_cadet_arag_btf(i,j,1) -       &
-             (cobalt%f_ndet_btf(i,j,1) - cobalt%fndet_burial(i,j)) * cobalt%c_2_n
-          ! uncomment for "no mass change" test (next 2 lines)
-          !cobalt%b_dic(i,j) =  - cobalt%f_cadet_calc_btf(i,j,1)  - cobalt%f_cadet_arag_btf(i,j,1) -            &
-          !   (cobalt%f_ndet_btf(i,j,1) - cobalt%fndet_burial(i,j)) * cobalt%c_2_n 
-          cobalt%b_fed(i,j) = - cobalt%ffe_sed(i,j) - cobalt%ffe_geotherm(i,j)
-          ! uncomment for "no mass change" test (next line)
-          !cobalt%b_fed(i,j) = - cobalt%f_fedet_btf(i,j,1)
-          cobalt%b_nh4(i,j) = - cobalt%f_ndet_btf(i,j,1) + cobalt%fndet_burial(i,j)
-          cobalt%b_no3(i,j) = cobalt%fno3denit_sed(i,j)
-          cobalt%b_o2(i,j)  = cobalt%o2_2_nh4 * (cobalt%fnoxic_sed(i,j) + cobalt%fnfeso4red_sed(i,j))
-          cobalt%b_po4(i,j) = - cobalt%f_pdet_btf(i,j,1) + cobalt%fpdet_burial(i,j)
-          cobalt%b_sio4(i,j)= - cobalt%f_sidet_btf(i,j,1)
-
-       endif !}
-    enddo; enddo  !} i, j
-
-    do k = 2, nk ; do j = jsc, jec ; do i = isc, iec   !{
-       cobalt%f_cased(i,j,k) = 0.0
-    enddo; enddo ; enddo  !} i,j,k
-
-    call mpp_clock_end(id_clock_ballast_loops)
-
-    call g_tracer_set_values(tracer_list,'alk',  'btf', cobalt%b_alk ,isd,jsd)
-    call g_tracer_set_values(tracer_list,'dic',  'btf', cobalt%b_dic ,isd,jsd)
-    call g_tracer_set_values(tracer_list,'fed',  'btf', cobalt%b_fed ,isd,jsd)
-    call g_tracer_set_values(tracer_list,'nh4',  'btf', cobalt%b_nh4 ,isd,jsd)
-    call g_tracer_set_values(tracer_list,'no3',  'btf', cobalt%b_no3 ,isd,jsd)
-    call g_tracer_set_values(tracer_list,'o2',   'btf', cobalt%b_o2  ,isd,jsd)
-    call g_tracer_set_values(tracer_list,'po4',  'btf', cobalt%b_po4 ,isd,jsd)
-    call g_tracer_set_values(tracer_list,'sio4', 'btf', cobalt%b_sio4,isd,jsd)
-!
-    call mpp_clock_begin(id_clock_source_sink_loop1)
+    if (do_CBED) then
+      call generic_CBED_sediments_update_from_source(cobalt%jfe_coast, cobalt%fe_coast, cobalt%f_ndet_btf, &
+           cobalt%c_2_n, cobalt%frac_burial, cobalt%zt, cobalt%z_burial, cobalt%fndet_burial, cobalt%fpdet_burial, &
+           cobalt%f_pdet_btf, cobalt%fno3denit_sed, cobalt%f_no3, cobalt%Rho_0, cobalt%n_2_n_denit, &
+           cobalt%k_no3_denit, cobalt%f_o2, cobalt%o2_min, cobalt%fnoxic_sed, cobalt%o2_2_nh4, cobalt%fnfeso4red_sed, &
+           cobalt%ffe_sed, cobalt%fe_2_n_sed, cobalt%ffe_sed_max, cobalt%ffe_geotherm, cobalt%ffe_iceberg, &
+           cobalt%ffe_iceberg_ratio, cobalt%jprod_fed, cobalt%fcased_redis_surfresp, cobalt%f_cadet_calc_btf, &
+           cobalt%phi_surfresp_cased, cobalt%cased_redis_coef, cobalt%gamma_cased*max, cobalt%omega_calc, &
+           cobalt%phi_deepresp_cased, cobalt%alpha_cased, cobalt%cased_redis_delz, cobalt%f_lithdet_btf, &
+           cobalt%beta_cased, cobalt%fcased_redis, cobalt%f_cased, cobalt%cased_steady, cobalt%fcased_burial, &
+           cobalt%Co_cased, cobalt%z_se, cobalt%b_alk, cobalt%f_cadet_arag_btf, cobalt%alk_2_n_denit, cobalt%b_dic, &
+           cobalt%b_fed, cobalt%f_fedet_btf, cobalt%b_nh4, cobalt%b_no3, cobalt%b_o2, cobalt%b_po4, cobalt%b_sio4, &
+           cobalt%f_sidet_btf, mask_coast, grid_tmask, grid_dat, grid_kmt, isc,iec, jsc,jec, &
+           isd, jsd, nk, r_dt, internal_heat, dt, frunoff, rho_dzt, id_clock_ballast_loops)
+    else
+      call generic_COBALT_sediments_update_from_source(mask_coast, grid_tmask, grid_dat, grid_kmt, isc,iec, jsc,jec, &
+           isd, jsd, nk, r_dt, internal_heat, dt, frunoff, rho_dzt, id_clock_ballast_loops)
+    endif
 !
 !-----------------------------------------------------------------------
 ! 8: Source/sink calculations 
@@ -11667,7 +11702,67 @@ write (stdlogunit, generic_COBALT_nml)
 
 !==============================================================================================================
 ! Send data for bottom layer
-    call generic_COBALT_btm_update_from_source(model_time, grid_tmask, isc, jsc, iec, jec)
+    if (do_CBED) then
+      ! Remove any diagnostics that aren't needed in new CBED model
+      ! and add send_data calls for any new diagnostics for CBED here:
+      if (cobalt%id_fcadet_arag_btm .gt. 0)           &
+           used = g_send_data(cobalt%id_fcadet_arag_btm,   cobalt%fcadet_arag_btm,      &
+           model_time, rmask = grid_tmask(:,:,1),&
+           is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+      if (cobalt%id_fcadet_calc_btm .gt. 0)           &
+           used = g_send_data(cobalt%id_fcadet_calc_btm,   cobalt%fcadet_calc_btm,      &
+           model_time, rmask = grid_tmask(:,:,1),&
+           is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+      if (cobalt%id_ffedet_btm .gt. 0)           &
+           used = g_send_data(cobalt%id_ffedet_btm,   cobalt%ffedet_btm,             &
+           model_time, rmask = grid_tmask(:,:,1),&
+           is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+      if (cobalt%id_fndet_btm .gt. 0)            &
+           used = g_send_data(cobalt%id_fndet_btm,    cobalt%fndet_btm,              &
+           model_time, rmask = grid_tmask(:,:,1),&
+           is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+      if (cobalt%id_fpdet_btm .gt. 0)            &
+           used = g_send_data(cobalt%id_fpdet_btm,    cobalt%fpdet_btm,              &
+           model_time, rmask = grid_tmask(:,:,1),&
+           is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+      if (cobalt%id_fsidet_btm .gt. 0)           &
+           used = g_send_data(cobalt%id_fsidet_btm,   cobalt%fsidet_btm,             &
+           model_time, rmask = grid_tmask(:,:,1),&
+           is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+      if (cobalt%id_flithdet_btm .gt. 0)           &
+           used = g_send_data(cobalt%id_flithdet_btm,   cobalt%flithdet_btm,             &
+           model_time, rmask = grid_tmask(:,:,1),&
+           is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+    else
+      if (cobalt%id_fcadet_arag_btm .gt. 0)           &
+           used = g_send_data(cobalt%id_fcadet_arag_btm,   cobalt%fcadet_arag_btm,      &
+           model_time, rmask = grid_tmask(:,:,1),&
+           is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+      if (cobalt%id_fcadet_calc_btm .gt. 0)           &
+           used = g_send_data(cobalt%id_fcadet_calc_btm,   cobalt%fcadet_calc_btm,      &
+           model_time, rmask = grid_tmask(:,:,1),&
+           is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+      if (cobalt%id_ffedet_btm .gt. 0)           &
+           used = g_send_data(cobalt%id_ffedet_btm,   cobalt%ffedet_btm,             &
+           model_time, rmask = grid_tmask(:,:,1),&
+           is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+      if (cobalt%id_fndet_btm .gt. 0)            &
+           used = g_send_data(cobalt%id_fndet_btm,    cobalt%fndet_btm,              &
+           model_time, rmask = grid_tmask(:,:,1),&
+           is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+      if (cobalt%id_fpdet_btm .gt. 0)            &
+           used = g_send_data(cobalt%id_fpdet_btm,    cobalt%fpdet_btm,              &
+           model_time, rmask = grid_tmask(:,:,1),&
+           is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+      if (cobalt%id_fsidet_btm .gt. 0)           &
+           used = g_send_data(cobalt%id_fsidet_btm,   cobalt%fsidet_btm,             &
+           model_time, rmask = grid_tmask(:,:,1),&
+           is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+      if (cobalt%id_flithdet_btm .gt. 0)           &
+           used = g_send_data(cobalt%id_flithdet_btm,   cobalt%flithdet_btm,             &
+           model_time, rmask = grid_tmask(:,:,1),&
+           is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+    endif
 
 !==============================================================================================================
 
@@ -11675,6 +11770,225 @@ write (stdlogunit, generic_COBALT_nml)
 
   end subroutine generic_COBALT_update_from_source
 
+
+  ! <SUBROUTINE NAME="generic_COBALT_sediments_update_from_source">
+  !  <OVERVIEW>
+  !   generic_COBALT_sediments_update_from_source
+  !  </OVERVIEW>
+  !  <DESCRIPTION>
+  !    TBD
+  !  </DESCRIPTION>
+  !  <TEMPLATE>
+  !   call generic_COBALT_sediments_update_from_source()
+  !  </TEMPLATE>
+  !  <IN NAME="tracer_list" TYPE="type(g_tracer_type), pointer">
+  !   Pointer to the head of generic tracer list.
+  !  </IN>
+  !  <IN NAME="ilb,jlb" TYPE="integer">
+  !   Lower bounds of x and y extents of input arrays on data domain
+  !  </IN>
+  !  <IN NAME="SST" TYPE="real, dimension(ilb:,jlb:)">
+  !   Sea Surface Temperature
+  !  </IN>
+  !  <IN NAME="SSS" TYPE="real, dimension(ilb:,jlb:)">
+  !   Sea Surface Salinity
+  !  </IN>
+  !  <IN NAME="rho" TYPE="real, dimension(ilb:,jlb:,:,:)">
+  !   Ocean density
+  !  </IN>
+  !  <IN NAME="tau" TYPE="integer">
+  !   Time step index of %field
+  !  </IN>
+  ! </SUBROUTINE>
+  suboutine generic_COBALT_sediments_update_from_source(mask_coast, grid_tmask, grid_dat, grid_kmt, isc,iec, jsc,jec &
+            isd, jsd, nk, r_dt, internal_heat, dt, frunoff, rho_dzt, id_clock_ballast_loops)
+    real, dimension(ilb:,jlb:), intent(in) :: grid_dat
+    real, dimension(:,:,:), intent(in)     :: grid_tmask
+    integer, dimension(:,:), intent(in)    :: mask_coast, grid_kmt
+    integer, intent(in)                    :: isc,iec, jsc,jec, isd, jsd, nk
+    real, intent(in)                       :: r_dt, dt
+    real, dimension(:,:), intent(in)       :: internal_heat
+    real, dimension(:,:), intent(in)       :: frunoff
+    real, dimension(:,:,:), intent(in)     :: rho_dzt
+    integer, intent(in)                    :: id_clock_ballast_loops
+
+    integer :: i, j, k
+    real :: fpoc_btm, log_fpoc_btm
+
+    !
+    ! Coastal iron input (default is 0)
+    !
+    !do k = 1, nk ; do j = jsc, jec ; do i = isc, iec   !{
+    !   cobalt%jfe_coast(i,j,k) = cobalt%fe_coast * mask_coast(i,j) * grid_tmask(i,j,k) / &
+    !        sqrt(grid_dat(i,j))
+    !     ! uncomment if running "no mass change" test
+    !     !cobalt%jfe_coast(i,j,k) = 0.0
+    !enddo; enddo; enddo  !} i,j,k
+
+    do j = jsc, jec; do i = isc, iec  !{
+       k = grid_kmt(i,j)
+       if (k .gt. 0) then !{
+          !
+          ! Nitrogen flux from the sediments
+          !
+          if (cobalt%f_ndet_btf(i,j,1) .gt. 0.0) then !{
+             ! fpoc_bottom in mmoles C m-2 day-1 for burial relationship
+             fpoc_btm = cobalt%f_ndet_btf(i,j,1)*cobalt%c_2_n*sperd*1000.0
+             !cobalt%frac_burial(i,j) = (0.013 + 0.53*fpoc_btm**2.0)/((7.0+fpoc_btm)**2.0)
+             cobalt%frac_burial(i,j) = 0.013 + 0.53*fpoc_btm**2.0/((7.0+fpoc_btm)**2.0) * &
+                  cobalt%zt(i,j,k) / (cobalt%z_burial + cobalt%zt(i,j,k))
+             ! uncomment for "no mass change" test
+             !cobalt%frac_burial(i,j) = 0.0
+             cobalt%fndet_burial(i,j) = cobalt%frac_burial(i,j)*cobalt%f_ndet_btf(i,j,1)
+             cobalt%fpdet_burial(i,j) = cobalt%frac_burial(i,j)*cobalt%f_pdet_btf(i,j,1)
+             ! fpoc_bottom in micromoles C cm-2 day-1 for denitrification relationship, cap at 43
+             ! to prevent anomalous extrapolation of the relationship
+             log_fpoc_btm = log(min(43.0,0.1*fpoc_btm))
+             cobalt%fno3denit_sed(i,j) = min(cobalt%f_no3(i,j,k)*cobalt%Rho_0*r_dt,  &
+                  min((cobalt%f_ndet_btf(i,j,1)-cobalt%fndet_burial(i,j))*cobalt%n_2_n_denit, &
+                  10.0**(-0.9543+0.7662*log_fpoc_btm - 0.235*log_fpoc_btm**2.0)/(cobalt%c_2_n*sperd*100.0)* &
+                  cobalt%n_2_n_denit*cobalt%f_no3(i,j,k)/(cobalt%k_no3_denit + cobalt%f_no3(i,j,k)))) * &
+                  cobalt%zt(i,j,k) / (cobalt%z_burial + cobalt%zt(i,j,k))
+             ! uncomment "no mass change" test
+             !cobalt%fno3denit_sed(i,j) = 0.0
+             if (cobalt%f_o2(i,j,k) .gt. cobalt%o2_min) then  !{
+                cobalt%fnoxic_sed(i,j) = max(0.0, min(cobalt%f_o2(i,j,k)*cobalt%Rho_0*r_dt*(1.0/cobalt%o2_2_nh4), &
+                                         cobalt%f_ndet_btf(i,j,1) - cobalt%fndet_burial(i,j) - &
+                                         cobalt%fno3denit_sed(i,j)/cobalt%n_2_n_denit))
+             else
+                cobalt%fnoxic_sed(i,j) = 0.0
+             endif !}
+             cobalt%fno3denit_sed(i,j) = cobalt%fno3denit_sed(i,j) + &
+                                         min(cobalt%f_no3(i,j,k)*cobalt%Rho_0*r_dt-cobalt%fno3denit_sed(i,j), &
+                                         (cobalt%f_ndet_btf(i,j,1)-cobalt%fnoxic_sed(i,j)-cobalt%fndet_burial(i,j) - &
+                                         cobalt%fno3denit_sed(i,j)/cobalt%n_2_n_denit)*cobalt%n_2_n_denit)
+             cobalt%fnfeso4red_sed(i,j) = max(0.0, cobalt%f_ndet_btf(i,j,1)-cobalt%fnoxic_sed(i,j)- &
+                                          cobalt%fndet_burial(i,j)-cobalt%fno3denit_sed(i,j)/cobalt%n_2_n_denit)
+          else
+             cobalt%fnfeso4red_sed(i,j) = 0.0
+             cobalt%fno3denit_sed(i,j) = 0.0
+             cobalt%fnoxic_sed(i,j) = 0.0
+          endif !}
+
+          ! iron from sediment (Elrod)
+          !cobalt%ffe_sed(i,j) = cobalt%fe_2_n_sed * cobalt%f_ndet_btf(i,j,1)
+          ! iron from sediment (Dale)
+          cobalt%ffe_sed(i,j) = cobalt%ffe_sed_max * tanh( (cobalt%f_ndet_btf(i,j,1)*cobalt%c_2_n*sperd*1.0e3)/ &
+                                max(cobalt%f_o2(i,j,k)*1.0e6,epsln) )
+
+          cobalt%ffe_geotherm(i,j) = cobalt%ffe_geotherm_ratio*internal_heat(i,j)*4184.0/dt
+          ! default for icebergs: 40 nanomoles fe dissolved per kg of icemelt
+          ! sediments: Raiswell et al., 2008: 0.5 kg sed per m-3 of iceberg; 0.1% mean Fe, 5-10% soluble
+          ! ~500 nanomoles Fe per kg-1 icemelt
+          cobalt%ffe_iceberg(i,j) = cobalt%ffe_iceberg_ratio*max(frunoff(i,j),0.0)
+          cobalt%jprod_fed(i,j,1) = cobalt%jprod_fed(i,j,1) + cobalt%ffe_iceberg(i,j)/rho_dzt(i,j,1)
+
+          !
+          ! Calcium carbonate flux and burial
+          ! 2015/11/18 JGJ: fix from JPD to cap the absolute cased dissolution rate to 10 mmol m-2 d-1
+          ! Calcite cycling in the sediments is based on the model of   Dunne et al., 2012.
+          !
+          ! phi_surfresp_cased = 0.14307   ! const for enhanced diss., surf sed respiration (dimensionless)
+          ! phi_deepresp_cased = 4.1228    ! const for enhanced diss., deep sed respiration (dimensionless)
+          ! alpha_cased = 2.7488 ! exponent controlling non-linearity of deep dissolution
+          ! beta_cased = -2.2185 ! exponent controlling non-linearity of effective thickness
+          ! gamma_cased = 0.03607/spery   ! dissolution rate constant
+          ! Co_cased = 8.1e3        ! moles CaCo3 m-3 for pure calcite sediment with porosity = 0.7
+          !
+          ! if cased_steady is true, burial is calculated from Dunne's eq. (2) assuming dcased/dt = 0.
+          ! This ensures that all the calcite bottom flux is partitioned between burial and redissolution.
+          ! The steady state cased value of cased is calculated to reflect the changing bottom conditions.
+          ! This influences the the partitioning of burial and redissolution over time, but there are
+          ! no alkalinity changes/drifts associated with the long-term evolution of cased
+          !
+          ! If cased_steady is false, calcite is partitioned between dissolution, burial and evolving
+          ! cased as described in Dunne et al. (2012).  The multi-century scale evolution of cased
+          ! impacts alkalinity, but care must to ensure that cased starts in equilibrium with the
+          ! mean ocean state to avoid unrealistic drifts.
+
+          ! Enhanced dissolution by fast respiration near the sediment surface, proportional
+          ! to organic flux, moles Ca m-2 s-1, limited to a max 1/2 the instantaneous calcite flux
+          cobalt%fcased_redis_surfresp(i,j)=min(0.5*cobalt%f_cadet_calc_btf(i,j,1), &
+            cobalt%phi_surfresp_cased*cobalt%f_ndet_btf(i,j,1)*cobalt%c_2_n)
+          ! Ca-specific dissolution coeficient, depends on calcite saturation state and is enhanced by
+          ! respiration deep in the sediment (s-1), non-linearity controlled by alpha_cased
+          cobalt%cased_redis_coef(i,j) = cobalt%gamma_cased*max(0.0,1.0-cobalt%omega_calc(i,j,k)+ &
+            cobalt%phi_deepresp_cased*cobalt%f_ndet_btf(i,j,1)*cobalt%c_2_n*spery)**cobalt%alpha_cased
+          ! Effective thickness term that enhances burial of calcite when total sediment accumulation is high
+          ! dimensionless value between 0 and 1
+          cobalt%cased_redis_delz(i,j) = max(1.0, &
+            cobalt%f_lithdet_btf(i,j,1)*spery+cobalt%f_cadet_calc_btf(i,j,1)*100.0*spery)**cobalt%beta_cased
+          ! calculate the sediment redissolution rate (moles Ca m-2 sec-1). This calculation is subject to
+          ! three limiters: a) a maximum of 1/2 of the total cased over one time step; b) a maximum of 0.01
+          ! moles Ca per day; and c) a minimum of 0.0
+          cobalt%fcased_redis(i,j) = max(0.0, min(0.01/sperd, min(0.5*cobalt%f_cased(i,j,1)*r_dt,  &
+            cobalt%fcased_redis_surfresp(i,j)+cobalt%cased_redis_coef(i,j)*cobalt%cased_redis_delz(i,j)*cobalt%f_cased(i,j,1))) )
+          !
+          ! Old expression
+          !
+          !cobalt%fcased_redis(i,j) = max(0.0, min(0.01/sperd,min(0.5 * cobalt%f_cased(i,j,1) * r_dt, min(0.5 *       &
+          !   cobalt%f_cadet_calc_btf(i,j,1), 0.14307 * cobalt%f_ndet_btf(i,j,1) * cobalt%c_2_n) +        &
+          !   0.03607 / spery * max(0.0, 1.0 - cobalt%omega_calc(i,j,k) +   &
+          !   4.1228 * cobalt%f_ndet_btf(i,j,1) * cobalt%c_2_n * spery)**(2.7488) *                        &
+          !   max(1.0, cobalt%f_lithdet_btf(i,j,1) * spery + cobalt%f_cadet_calc_btf(i,j,1) * 100.0 *  &
+          !   spery)**(-2.2185) * cobalt%f_cased(i,j,1))))*grid_tmask(i,j,k)
+
+          if (cobalt%cased_steady) then
+            cobalt%fcased_burial(i,j) = cobalt%f_cadet_calc_btf(i,j,1) - cobalt%fcased_redis(i,j)
+            cobalt%f_cased(i,j,1) = cobalt%fcased_burial(i,j)*cobalt%Co_cased/cobalt%f_cadet_calc_btf(i,j,1)
+          else
+            cobalt%fcased_burial(i,j) = max(0.0, cobalt%f_cadet_calc_btf(i,j,1) * cobalt%f_cased(i,j,1) / &
+              cobalt%Co_cased)
+            cobalt%f_cased(i,j,1) = cobalt%f_cased(i,j,1) + (cobalt%f_cadet_calc_btf(i,j,1) -            &
+              cobalt%fcased_redis(i,j) - cobalt%fcased_burial(i,j)) / cobalt%z_sed * dt *                &
+              grid_tmask(i,j,k)
+          endif
+
+          ! uncomment for "no mass change" test (next 3 lines)
+          !cobalt%fcased_redis(i,j) = cobalt%f_cadet_calc_btf(i,j,1)
+          !cobalt%fcased_burial(i,j) = 0.0
+          !cobalt%f_cased(i,j,1) = cobalt%f_cased(i,j,1)
+          !
+          ! Bottom flux boundaries passed to the vertical mixing routine
+          !
+
+          cobalt%b_alk(i,j) = - 2.0*(cobalt%fcased_redis(i,j)+cobalt%f_cadet_arag_btf(i,j,1)) -    &
+             cobalt%fnoxic_sed(i,j) - cobalt%fno3denit_sed(i,j)*cobalt%alk_2_n_denit
+          cobalt%b_dic(i,j) =  - cobalt%fcased_redis(i,j) - cobalt%f_cadet_arag_btf(i,j,1) -       &
+             (cobalt%f_ndet_btf(i,j,1) - cobalt%fndet_burial(i,j)) * cobalt%c_2_n
+          ! uncomment for "no mass change" test (next 2 lines)
+          !cobalt%b_dic(i,j) =  - cobalt%f_cadet_calc_btf(i,j,1)  - cobalt%f_cadet_arag_btf(i,j,1) -            &
+          !   (cobalt%f_ndet_btf(i,j,1) - cobalt%fndet_burial(i,j)) * cobalt%c_2_n
+          cobalt%b_fed(i,j) = - cobalt%ffe_sed(i,j) - cobalt%ffe_geotherm(i,j)
+          ! uncomment for "no mass change" test (next line)
+          !cobalt%b_fed(i,j) = - cobalt%f_fedet_btf(i,j,1)
+          cobalt%b_nh4(i,j) = - cobalt%f_ndet_btf(i,j,1) + cobalt%fndet_burial(i,j)
+          cobalt%b_no3(i,j) = cobalt%fno3denit_sed(i,j)
+          cobalt%b_o2(i,j)  = cobalt%o2_2_nh4 * (cobalt%fnoxic_sed(i,j) + cobalt%fnfeso4red_sed(i,j))
+          cobalt%b_po4(i,j) = - cobalt%f_pdet_btf(i,j,1) + cobalt%fpdet_burial(i,j)
+          cobalt%b_sio4(i,j)= - cobalt%f_sidet_btf(i,j,1)
+
+       endif !}
+    enddo; enddo  !} i, j
+
+    do k = 2, nk ; do j = jsc, jec ; do i = isc, iec   !{
+       cobalt%f_cased(i,j,k) = 0.0
+    enddo; enddo ; enddo  !} i,j,k
+
+    call mpp_clock_end(id_clock_ballast_loops)
+
+    call g_tracer_set_values(tracer_list,'alk',  'btf', cobalt%b_alk ,isd,jsd)
+    call g_tracer_set_values(tracer_list,'dic',  'btf', cobalt%b_dic ,isd,jsd)
+    call g_tracer_set_values(tracer_list,'fed',  'btf', cobalt%b_fed ,isd,jsd)
+    call g_tracer_set_values(tracer_list,'nh4',  'btf', cobalt%b_nh4 ,isd,jsd)
+    call g_tracer_set_values(tracer_list,'no3',  'btf', cobalt%b_no3 ,isd,jsd)
+    call g_tracer_set_values(tracer_list,'o2',   'btf', cobalt%b_o2  ,isd,jsd)
+    call g_tracer_set_values(tracer_list,'po4',  'btf', cobalt%b_po4 ,isd,jsd)
+    call g_tracer_set_values(tracer_list,'sio4', 'btf', cobalt%b_sio4,isd,jsd)
+!
+    call mpp_clock_begin(id_clock_source_sink_loop1)
+!
+  end subroutine generic_COBALT_sediments_update_from_source
 
   ! <SUBROUTINE NAME="generic_COBALT_set_boundary_values">
   !  <OVERVIEW>
@@ -12364,8 +12678,24 @@ write (stdlogunit, generic_COBALT_nml)
     allocate(cobalt%fpdet_burial(isd:ied, jsd:jed))       ; cobalt%fpdet_burial=0.0
 !==============================================================================================================
 ! Bottom Layer
-    call allocate_cobalt_btm(isd, ied, jsd, jed)
-    call get_from_btm(cobalt%fcadet_calc_btm, cobalt%ffedet_btm)
+    if (do_CBED) then
+      ! Remove any diagnostics that aren't needed in new CBED model and allocate any new diagnostics for CBED here:
+      allocate(cobalt%fcadet_arag_btm(isd:ied, jsd:jed))    ; cobalt%fcadet_arag_btm=0.0
+      allocate(cobalt%fcadet_calc_btm(isd:ied, jsd:jed))    ; cobalt%fcadet_calc_btm=0.0
+      allocate(cobalt%ffedet_btm(isd:ied, jsd:jed))         ; cobalt%ffedet_btm=0.0
+      allocate(cobalt%flithdet_btm(isd:ied, jsd:jed))       ; cobalt%flithdet_btm=0.0
+      allocate(cobalt%fpdet_btm(isd:ied, jsd:jed))          ; cobalt%fpdet_btm=0.0
+      allocate(cobalt%fndet_btm(isd:ied, jsd:jed))          ; cobalt%fndet_btm=0.0
+      allocate(cobalt%fsidet_btm(isd:ied, jsd:jed))         ; cobalt%fsidet_btm=0.0
+    else
+      allocate(cobalt%fcadet_arag_btm(isd:ied, jsd:jed))    ; cobalt%fcadet_arag_btm=0.0
+      allocate(cobalt%fcadet_calc_btm(isd:ied, jsd:jed))    ; cobalt%fcadet_calc_btm=0.0
+      allocate(cobalt%ffedet_btm(isd:ied, jsd:jed))         ; cobalt%ffedet_btm=0.0
+      allocate(cobalt%flithdet_btm(isd:ied, jsd:jed))       ; cobalt%flithdet_btm=0.0
+      allocate(cobalt%fpdet_btm(isd:ied, jsd:jed))          ; cobalt%fpdet_btm=0.0
+      allocate(cobalt%fndet_btm(isd:ied, jsd:jed))          ; cobalt%fndet_btm=0.0
+      allocate(cobalt%fsidet_btm(isd:ied, jsd:jed))         ; cobalt%fsidet_btm=0.0
+    endif
 !==============================================================================================================
 ! JGJ 2016/08/08 CMIP6 OcnBgchem 
     allocate(cobalt%dissoc(isd:ied, jsd:jed, 1:nk))        ; cobalt%dissoc=0.0
@@ -12877,7 +13207,25 @@ write (stdlogunit, generic_COBALT_nml)
     deallocate(cobalt%mask_z_sat_calc)
 !==============================================================================================================
 ! Bottom Layer
-    call deallocate_cobalt_btm
+    if (do_CBED) then
+      ! Remove any diagnostics that aren't needed in new CBED model
+      ! and deallocate any new diagnostics for CBED here:
+      deallocate(cobalt%fcadet_arag_btm)
+      deallocate(cobalt%fcadet_calc_btm)
+      deallocate(cobalt%ffedet_btm)
+      deallocate(cobalt%flithdet_btm)
+      deallocate(cobalt%fpdet_btm)
+      deallocate(cobalt%fndet_btm)
+      deallocate(cobalt%fsidet_btm)
+    else
+      deallocate(cobalt%fcadet_arag_btm)
+      deallocate(cobalt%fcadet_calc_btm)
+      deallocate(cobalt%ffedet_btm)
+      deallocate(cobalt%flithdet_btm)
+      deallocate(cobalt%fpdet_btm)
+      deallocate(cobalt%fndet_btm)
+      deallocate(cobalt%fsidet_btm)
+    endif
 !==============================================================================================================
 ! JGJ 2016/08/08 CMIP6 OcnBgchem 
     deallocate(cobalt%f_alk_int_100)  
