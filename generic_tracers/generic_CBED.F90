@@ -1,5 +1,6 @@
 module generic_CBED
 
+  use mpp_mod,           only: mpp_clock_end
   use time_manager_mod,  only: time_type
 
   use g_tracer_utils, only : g_tracer_type, g_tracer_get_common
@@ -22,10 +23,10 @@ contains
            fcadet_calc_btm, id_fcadet_calc_btm, ffedet_btm, id_ffedet_btm, &
            flithdet_btm, id_flithdet_btm, fndet_btm, id_fndet_btm, &
            fpdet_btm, id_fpdet_btm, fsidet_btm, id_fsidet_btm, &
-		   tracer_list, dt, tau, model_time)
+           tracer_list, dt, tau, model_time)
     real, dimension(:,:), intent(inout) :: fcadet_arag_btm, fcadet_calc_btm, ffedet_btm, &
                                            flithdet_btm, fndet_btm, fpdet_btm, fsidet_btm
-	integer, intent(inout)              :: id_fcadet_arag_btm, id_fcadet_calc_btm, id_ffedet_btm, &
+    integer, intent(inout)              :: id_fcadet_arag_btm, id_fcadet_calc_btm, id_ffedet_btm, &
                                            id_flithdet_btm, id_fndet_btm, id_fpdet_btm, id_fsidet_btm
     type(g_tracer_type), pointer        :: tracer_list
     real,               intent(in)      :: dt
@@ -125,44 +126,48 @@ contains
   end subroutine generic_CBED_sediments_update_from_bottom
 
   ! Subroutine generic_CBED_sediments_update_from_source is intended to be modified to become the CBED bottom layer model
-  subroutine generic_CBED_sediments_update_from_source(jfe_coast, fe_coast, f_ndet_btf, &
-        c_2_n, frac_burial, zt, z_burial, fndet_burial, fpdet_burial, &
-        f_pdet_btf, fno3denit_sed, f_no3, Rho_0, n_2_n_denit, &
-        k_no3_denit, f_o2, o2_min, fnoxic_sed, o2_2_nh4, fnfeso4red_sed, &
-        ffe_sed, fe_2_n_sed, ffe_sed_max, ffe_geotherm, ffe_iceberg, &
-        ffe_iceberg_ratio, jprod_fed, fcased_redis_surfresp, f_cadet_calc_btf, &
-        phi_surfresp_cased, cased_redis_coef, gamma_cased*max, omega_calc, &
-        phi_deepresp_cased, alpha_cased, cased_redis_delz, f_lithdet_btf, &
-        beta_cased, fcased_redis, f_cased, cased_steady, fcased_burial, &
-        Co_cased, z_se, b_alk, f_cadet_arag_btf, alk_2_n_denit, b_dic, &
-        b_fed, f_fedet_btf, b_nh4, b_no3, b_o2, b_po4, b_sio4, &
-        f_sidet_btf, mask_coast, grid_tmask, grid_dat, grid_kmt, isc,iec, jsc,jec, &
-        isd, jsd, nk, r_dt, internal_heat, dt, frunoff, rho_dzt, id_clock_ballast_loops)
-    real, intent(inout) :: jfe_coast, fe_coast, f_ndet_btf, &
-        c_2_n, frac_burial, zt, z_burial, fndet_burial, fpdet_burial, &
-        f_pdet_btf, fno3denit_sed, f_no3, Rho_0, n_2_n_denit, &
-        k_no3_denit, f_o2, o2_min, fnoxic_sed, o2_2_nh4, fnfeso4red_sed, &
-        ffe_sed, fe_2_n_sed, ffe_sed_max, ffe_geotherm, ffe_iceberg, &
-        ffe_iceberg_ratio, jprod_fed, fcased_redis_surfresp, f_cadet_calc_btf, &
-        phi_surfresp_cased, cased_redis_coef, gamma_cased*max, omega_calc, &
-        phi_deepresp_cased, alpha_cased, cased_redis_delz, f_lithdet_btf, &
-        beta_cased, fcased_redis, f_cased, cased_steady, fcased_burial, &
-        Co_cased, z_se, b_alk, f_cadet_arag_btf, alk_2_n_denit, b_dic, &
-        b_fed, f_fedet_btf, b_nh4, b_no3, b_o2, b_po4, b_sio4, &
-        f_sidet_btf
-	real, dimension(ilb:,jlb:), intent(in) :: grid_dat
-    real, dimension(:,:,:), intent(in)     :: grid_tmask
-    integer, dimension(:,:), intent(in)    :: mask_coast, grid_kmt
-    integer, intent(in)                    :: isc,iec, jsc,jec, isd, jsd, nk
-    real, intent(in)                       :: r_dt, dt
-    real, dimension(:,:), intent(in)       :: internal_heat
-    real, dimension(:,:), intent(in)       :: frunoff
-    real, dimension(:,:,:), intent(in)     :: rho_dzt
-    integer, intent(in)                    :: id_clock_ballast_loops
+  subroutine generic_CBED_sediments_update_from_source(tracer_list, ilb, jlb, jfe_coast, fe_coast, &
+           f_ndet_btf, c_2_n, frac_burial, zt, z_burial, fndet_burial, &
+           fpdet_burial, f_pdet_btf, fno3denit_sed, f_no3, Rho_0, &
+           n_2_n_denit, k_no3_denit, f_o2, o2_min, fnoxic_sed, o2_2_nh4, &
+           fnfeso4red_sed, ffe_sed, fe_2_n_sed, ffe_sed_max, ffe_geotherm, &
+           ffe_iceberg, ffe_geotherm_ratio, ffe_iceberg_ratio, jprod_fed, &
+           fcased_redis_surfresp, f_cadet_calc_btf, phi_surfresp_cased, cased_redis_coef, &
+           gamma_cased, omega_calc, phi_deepresp_cased, alpha_cased, &
+           cased_redis_delz, f_lithdet_btf, beta_cased, fcased_redis, f_cased, &
+           cased_steady, fcased_burial, Co_cased, z_sed, b_alk, &
+           f_cadet_arag_btf, alk_2_n_denit, b_dic, b_fed, f_fedet_btf, &
+           b_nh4, b_no3, b_o2, b_po4, b_sio4, f_sidet_btf, mask_coast, &
+           grid_tmask, grid_dat, grid_kmt, isc,iec, jsc,jec, isd, jsd, nk, r_dt, internal_heat, dt, frunoff, rho_dzt, &
+           id_clock_ballast_loops)
+
+    type(g_tracer_type),          pointer       :: tracer_list
+    integer,                      intent(in)    :: ilb, jlb
+    real, dimension(:,:,:),       intent(inout) :: jfe_coast, jprod_fed, f_lithdet_btf, f_cased
+    real, dimension(:,:,:),       intent(in)    :: f_ndet_btf, zt, f_pdet_btf, f_no3, f_o2, f_cadet_calc_btf, omega_calc, &
+                                                   f_cadet_arag_btf, f_fedet_btf, f_sidet_btf
+    real,                         intent(in)    :: fe_coast, c_2_n, z_burial, Rho_0, n_2_n_denit, k_no3_denit, o2_min, &
+                                                   o2_2_nh4, fe_2_n_sed, ffe_sed_max, ffe_geotherm_ratio, &
+                                                   ffe_iceberg_ratio, phi_surfresp_cased, gamma_cased, phi_deepresp_cased, &
+                                                   alpha_cased, beta_cased, Co_cased, z_sed, alk_2_n_denit
+    real, dimension(:,:),         intent(inout) :: frac_burial, fndet_burial, fpdet_burial, fno3denit_sed, fnoxic_sed, &
+                                                   fnfeso4red_sed, ffe_sed, ffe_geotherm, ffe_iceberg, &
+                                                   fcased_redis_surfresp, cased_redis_coef, cased_redis_delz, fcased_redis, &
+                                                   fcased_burial, b_alk, b_dic, b_fed, b_nh4, b_no3, b_o2, b_po4, b_sio4
+    logical,                      intent(inout) :: cased_steady
+    real, dimension(ilb:,jlb:),   intent(in)    :: grid_dat
+    real, dimension(:,:,:),       intent(in)    :: grid_tmask
+    integer, dimension(:,:),      intent(in)    :: mask_coast, grid_kmt
+    integer,                      intent(in)    :: isc,iec, jsc,jec, isd, jsd, nk
+    real,                         intent(in)    :: r_dt, dt
+    real, dimension(ilb:,jlb:),   intent(in)    :: internal_heat
+    real, dimension(ilb:,jlb:),   intent(in)    :: frunoff
+    real, dimension(ilb:,jlb:,:), intent(in)    :: rho_dzt
+    integer,                      intent(in)    :: id_clock_ballast_loops
 
     integer :: i, j, k
     real :: fpoc_btm, log_fpoc_btm
-	
+
       !
     ! Coastal iron input (default is 0)
     !
@@ -333,9 +338,6 @@ contains
     call g_tracer_set_values(tracer_list,'o2',   'btf', b_o2  ,isd,jsd)
     call g_tracer_set_values(tracer_list,'po4',  'btf', b_po4 ,isd,jsd)
     call g_tracer_set_values(tracer_list,'sio4', 'btf', b_sio4,isd,jsd)
-!
-    call mpp_clock_begin(id_clock_source_sink_loop1)
-!
 
   end subroutine generic_CBED_sediments_update_from_source
 

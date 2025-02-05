@@ -6353,8 +6353,6 @@ write (stdlogunit, generic_COBALT_nml)
       call generic_COBALT_sediments_update_from_bottom(tracer_list, dt, tau, model_time)
     endif
 
-    call get_from_btm(cobalt%fcadet_calc_btm, cobalt%ffedet_btm)
-
   end subroutine generic_COBALT_update_from_bottom
 
   ! <SUBROUTINE NAME="generic_COBALT_sediments_update_from_bottom">
@@ -7878,23 +7876,27 @@ write (stdlogunit, generic_COBALT_nml)
 !-------------------------------------------------------------------------------------------------
 !
     if (do_CBED) then
-      call generic_CBED_sediments_update_from_source(cobalt%jfe_coast, cobalt%fe_coast, cobalt%f_ndet_btf, &
-           cobalt%c_2_n, cobalt%frac_burial, cobalt%zt, cobalt%z_burial, cobalt%fndet_burial, cobalt%fpdet_burial, &
-           cobalt%f_pdet_btf, cobalt%fno3denit_sed, cobalt%f_no3, cobalt%Rho_0, cobalt%n_2_n_denit, &
-           cobalt%k_no3_denit, cobalt%f_o2, cobalt%o2_min, cobalt%fnoxic_sed, cobalt%o2_2_nh4, cobalt%fnfeso4red_sed, &
-           cobalt%ffe_sed, cobalt%fe_2_n_sed, cobalt%ffe_sed_max, cobalt%ffe_geotherm, cobalt%ffe_iceberg, &
-           cobalt%ffe_iceberg_ratio, cobalt%jprod_fed, cobalt%fcased_redis_surfresp, cobalt%f_cadet_calc_btf, &
-           cobalt%phi_surfresp_cased, cobalt%cased_redis_coef, cobalt%gamma_cased*max, cobalt%omega_calc, &
-           cobalt%phi_deepresp_cased, cobalt%alpha_cased, cobalt%cased_redis_delz, cobalt%f_lithdet_btf, &
-           cobalt%beta_cased, cobalt%fcased_redis, cobalt%f_cased, cobalt%cased_steady, cobalt%fcased_burial, &
-           cobalt%Co_cased, cobalt%z_se, cobalt%b_alk, cobalt%f_cadet_arag_btf, cobalt%alk_2_n_denit, cobalt%b_dic, &
-           cobalt%b_fed, cobalt%f_fedet_btf, cobalt%b_nh4, cobalt%b_no3, cobalt%b_o2, cobalt%b_po4, cobalt%b_sio4, &
-           cobalt%f_sidet_btf, mask_coast, grid_tmask, grid_dat, grid_kmt, isc,iec, jsc,jec, &
-           isd, jsd, nk, r_dt, internal_heat, dt, frunoff, rho_dzt, id_clock_ballast_loops)
+      call generic_CBED_sediments_update_from_source(tracer_list, ilb, jlb, cobalt%jfe_coast, cobalt%fe_coast, &
+           cobalt%f_ndet_btf, cobalt%c_2_n, cobalt%frac_burial, cobalt%zt, cobalt%z_burial, cobalt%fndet_burial, &
+           cobalt%fpdet_burial, cobalt%f_pdet_btf, cobalt%fno3denit_sed, cobalt%f_no3, cobalt%Rho_0, &
+           cobalt%n_2_n_denit, cobalt%k_no3_denit, cobalt%f_o2, cobalt%o2_min, cobalt%fnoxic_sed, cobalt%o2_2_nh4, &
+           cobalt%fnfeso4red_sed, cobalt%ffe_sed, cobalt%fe_2_n_sed, cobalt%ffe_sed_max, cobalt%ffe_geotherm, &
+           cobalt%ffe_iceberg, cobalt%ffe_geotherm_ratio, cobalt%ffe_iceberg_ratio, cobalt%jprod_fed, &
+           cobalt%fcased_redis_surfresp, cobalt%f_cadet_calc_btf, cobalt%phi_surfresp_cased, cobalt%cased_redis_coef, &
+           cobalt%gamma_cased, cobalt%omega_calc, cobalt%phi_deepresp_cased, cobalt%alpha_cased, &
+           cobalt%cased_redis_delz, cobalt%f_lithdet_btf, cobalt%beta_cased, cobalt%fcased_redis, cobalt%f_cased, &
+           cobalt%cased_steady, cobalt%fcased_burial, cobalt%Co_cased, cobalt%z_sed, cobalt%b_alk, &
+           cobalt%f_cadet_arag_btf, cobalt%alk_2_n_denit, cobalt%b_dic, cobalt%b_fed, cobalt%f_fedet_btf, &
+           cobalt%b_nh4, cobalt%b_no3, cobalt%b_o2, cobalt%b_po4, cobalt%b_sio4, cobalt%f_sidet_btf, mask_coast, &
+           grid_tmask, grid_dat, grid_kmt, isc,iec, jsc,jec, isd, jsd, nk, r_dt, internal_heat, dt, frunoff, rho_dzt, &
+           id_clock_ballast_loops)
     else
-      call generic_COBALT_sediments_update_from_source(mask_coast, grid_tmask, grid_dat, grid_kmt, isc,iec, jsc,jec, &
-           isd, jsd, nk, r_dt, internal_heat, dt, frunoff, rho_dzt, id_clock_ballast_loops)
+      call generic_COBALT_sediments_update_from_source(tracer_list, ilb, jlb, mask_coast, grid_tmask, grid_dat, &
+           grid_kmt, isc,iec, jsc,jec, isd, jsd, nk, r_dt, internal_heat, dt, frunoff, rho_dzt, id_clock_ballast_loops)
     endif
+!
+    call mpp_clock_begin(id_clock_source_sink_loop1)
+!
 !
 !-----------------------------------------------------------------------
 ! 8: Source/sink calculations 
@@ -11800,17 +11802,20 @@ write (stdlogunit, generic_COBALT_nml)
   !   Time step index of %field
   !  </IN>
   ! </SUBROUTINE>
-  suboutine generic_COBALT_sediments_update_from_source(mask_coast, grid_tmask, grid_dat, grid_kmt, isc,iec, jsc,jec &
-            isd, jsd, nk, r_dt, internal_heat, dt, frunoff, rho_dzt, id_clock_ballast_loops)
-    real, dimension(ilb:,jlb:), intent(in) :: grid_dat
-    real, dimension(:,:,:), intent(in)     :: grid_tmask
-    integer, dimension(:,:), intent(in)    :: mask_coast, grid_kmt
-    integer, intent(in)                    :: isc,iec, jsc,jec, isd, jsd, nk
-    real, intent(in)                       :: r_dt, dt
-    real, dimension(:,:), intent(in)       :: internal_heat
-    real, dimension(:,:), intent(in)       :: frunoff
-    real, dimension(:,:,:), intent(in)     :: rho_dzt
-    integer, intent(in)                    :: id_clock_ballast_loops
+  subroutine generic_COBALT_sediments_update_from_source(tracer_list, ilb, jlb, mask_coast, grid_tmask, grid_dat, &
+           grid_kmt, isc,iec, jsc,jec, isd, jsd, nk, r_dt, internal_heat, dt, frunoff, rho_dzt, id_clock_ballast_loops)
+
+    type(g_tracer_type),          pointer    :: tracer_list
+    integer,                      intent(in) :: ilb, jlb
+    real, dimension(ilb:,jlb:),   intent(in) :: grid_dat
+    real, dimension(:,:,:),       intent(in) :: grid_tmask
+    integer, dimension(:,:),      intent(in) :: mask_coast, grid_kmt
+    integer,                      intent(in) :: isc,iec, jsc,jec, isd, jsd, nk
+    real,                         intent(in) :: r_dt, dt
+    real, dimension(ilb:,jlb:),   intent(in) :: internal_heat
+    real, dimension(ilb:,jlb:),   intent(in) :: frunoff
+    real, dimension(ilb:,jlb:,:), intent(in) :: rho_dzt
+    integer,                      intent(in) :: id_clock_ballast_loops
 
     integer :: i, j, k
     real :: fpoc_btm, log_fpoc_btm
@@ -11985,9 +11990,6 @@ write (stdlogunit, generic_COBALT_nml)
     call g_tracer_set_values(tracer_list,'o2',   'btf', cobalt%b_o2  ,isd,jsd)
     call g_tracer_set_values(tracer_list,'po4',  'btf', cobalt%b_po4 ,isd,jsd)
     call g_tracer_set_values(tracer_list,'sio4', 'btf', cobalt%b_sio4,isd,jsd)
-!
-    call mpp_clock_begin(id_clock_source_sink_loop1)
-!
   end subroutine generic_COBALT_sediments_update_from_source
 
   ! <SUBROUTINE NAME="generic_COBALT_set_boundary_values">
